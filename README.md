@@ -4,6 +4,8 @@ The "Skill Cards Purchased", "Weapons, Armor, Enchants", and "Inventory Items" s
 
 Also, I want each section to be an openable tray. So that each character card can be condensed down to just some basic information when not actively viewing that character's information. Each tray, while closed, can simply show a summary of information.
 
+Provide instructions for users who want to run their own copy from scratch. How would a user who has never run a laravel project before get started? Install PHP, install NPM, install Composer, maybe offer options for DB? Local JSON storage or maybe a local MySQL/XAMPP?
+
 # OrcQuest Upgrade Tracker
 
 OrcQuest Upgrade Tracker is a local Laravel/Vite app for tracking an OrcQuest campaign party, inventory, rekup resources, upgrade readiness, quest progress, and kraft planning.
