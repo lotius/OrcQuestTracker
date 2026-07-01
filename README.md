@@ -1,3 +1,9 @@
+# Next Steps
+
+The "Skill Cards Purchased", "Weapons, Armor, Enchants", and "Inventory Items" sections need to be more visually distinct.
+
+Also, I want each section to be an openable tray. So that each character card can be condensed down to just some basic information when not actively viewing that character's information.
+
 # OrcQuest Upgrade Tracker
 
 OrcQuest Upgrade Tracker is a local Laravel/Vite app for tracking an OrcQuest campaign party, inventory, rekup resources, upgrade readiness, quest progress, and kraft planning.
@@ -74,7 +80,7 @@ Each hand item has its own enchant slots:
 - Hand item 2 left enchant
 - Hand item 2 right enchant
 
-Armor keeps its own left and right enchant slots. This lets two one-handed items each track their own enchant pair instead of sharing one hand enchant pair across both weapons.
+Armor and artifact items also keep their own left and right enchant slots. Inventory rows use the same pattern, with the item in the center, the left enchant on the left, and the right enchant on the right, so enchants can follow an item when it moves between equipment and inventory.
 
 Inventory slots include a `Rekup` toggle. Turning this on means the card is being broken down for its rekup resources instead of being kept as usable gear. Rekuped cards contribute their listed wood, metal, leather, and gold values to the shared Rekup Pool on the Resources & Upgrades tab.
 
@@ -99,15 +105,18 @@ Some cards are automatically locked into Rekup status because they are not meani
 - Resources cards, such as `Resources - 1 Metal`
 - Potion cards, such as `Potion of Usoholi`
 
-These cards appear with the Rekup checkbox already checked and disabled. This prevents accidentally treating them as normal gear and ensures their resources or spent-card status is handled consistently.
+These cards appear with the Rekup checkbox already checked and disabled. Their enchant slots are also cleared and disabled because automatic-Rekup cards are not usable gear. Empty inventory slots also keep the Rekup checkbox disabled until an item is selected.
 
 Inventory items can be dragged between inventory slots and equipment slots. When items are moved, their rekup state is preserved where appropriate. Always-rekup items stay checked and locked even after being moved.
 
 Two-handed item handling is automatic:
 
-- selecting a two-handed item mirrors it into both hand slots
+- selecting a two-handed item, such as a Bow, Crossbow, or Heavy Crossbow, mirrors it into both hand slots
+- the real item bundle lives in Hand item 1
+- Hand item 2 becomes a locked mirror/occupancy slot
+- Hand item 2 enchant fields are cleared and disabled while mirrored
 - conflicting hand items are moved into the first available inventory slot when possible
-- the second hand slot is locked while mirrored
+- displaced items keep their left and right enchants when moved to inventory
 
 ## Rekup Pool
 

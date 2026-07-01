@@ -193,6 +193,97 @@ if (catalog && root) {
 
     const handSelect = (card, key) => card.querySelector(`select[name$="[${key}]"]`);
 
+    const enchantSelectsForItemSelect = (select) => {
+        if (! select) {
+            return { left: null, right: null };
+        }
+
+        if (select.name.includes('[inventory]')) {
+            const row = select.closest('[data-inventory-row]');
+            return {
+                left: row?.querySelector('select[name$="[left_enchant]"]') || null,
+                right: row?.querySelector('select[name$="[right_enchant]"]') || null,
+            };
+        }
+
+        const card = select.closest('[data-character]');
+        const match = select.name.match(/\[equipment\]\[(.+)\]$/);
+        const key = match?.[1];
+
+        if (! card || ! key) {
+            return { left: null, right: null };
+        }
+
+        if (key === 'armor_item') {
+            return {
+                left: card.querySelector('select[name$="[armor_left_enchant]"]') || null,
+                right: card.querySelector('select[name$="[armor_right_enchant]"]') || null,
+            };
+        }
+
+        if (key === 'artifact_item') {
+            return {
+                left: card.querySelector('select[name$="[artifact_left_enchant]"]') || null,
+                right: card.querySelector('select[name$="[artifact_right_enchant]"]') || null,
+            };
+        }
+
+        return {
+            left: card.querySelector(`select[name$="[${key}_left_enchant]"]`) || null,
+            right: card.querySelector(`select[name$="[${key}_right_enchant]"]`) || null,
+        };
+    };
+
+    const itemBundleForSelect = (select) => {
+        const rekup = rekupCheckboxFor(select);
+        const enchants = enchantSelectsForItemSelect(select);
+
+        const item = select?.value || '';
+        const canHaveEnchants = item && ! itemAlwaysRekup(item);
+
+        return {
+            item,
+            rekup: Boolean(rekup?.checked),
+            leftEnchant: canHaveEnchants ? (enchants.left?.value || '') : '',
+            rightEnchant: canHaveEnchants ? (enchants.right?.value || '') : '',
+        };
+    };
+
+    const setItemBundle = (select, bundle) => {
+        if (! select) {
+            return;
+        }
+
+        const item = bundle?.item || '';
+        const enchants = enchantSelectsForItemSelect(select);
+        const rekup = rekupCheckboxFor(select);
+        const canHaveEnchants = item && ! itemAlwaysRekup(item);
+
+        select.value = item;
+
+        if (enchants.left) {
+            enchants.left.value = canHaveEnchants ? (bundle?.leftEnchant || '') : '';
+        }
+
+        if (enchants.right) {
+            enchants.right.value = canHaveEnchants ? (bundle?.rightEnchant || '') : '';
+        }
+
+        if (rekup) {
+            rekup.checked = item ? itemAlwaysRekup(item) || Boolean(bundle?.rekup) : false;
+        }
+    };
+
+    const clearItemEnchantFields = (select) => {
+        const enchants = enchantSelectsForItemSelect(select);
+        if (enchants.left) {
+            enchants.left.value = '';
+        }
+        if (enchants.right) {
+            enchants.right.value = '';
+        }
+    };
+
     const firstEmptyInventorySelect = (card) => all('select[name*="[inventory]"][data-filter="item"]', card)
         .find((select) => ! select.value);
 
@@ -205,8 +296,8 @@ if (catalog && root) {
         select.dispatchEvent(new Event('change', { bubbles: true }));
     };
 
-    const moveItemToInventory = (card, itemIndex) => {
-        if (! itemIndex) {
+    const moveItemToInventory = (card, bundle) => {
+        if (! bundle?.item) {
             return false;
         }
 
@@ -215,11 +306,7 @@ if (catalog && root) {
             return false;
         }
 
-        inventorySelect.value = itemIndex;
-        const rekup = inventorySelect.closest('.flex')?.querySelector('[data-rekup]');
-        if (rekup) {
-            rekup.checked = itemAlwaysRekup(itemIndex);
-        }
+        setItemBundle(inventorySelect, bundle);
 
         return true;
     };
@@ -231,12 +318,31 @@ if (catalog && root) {
             return;
         }
 
+        const enchants = enchantSelectsForItemSelect(select);
         select.dataset.twoHandMirror = enabled ? 'true' : 'false';
         select.disabled = enabled || select.dataset.lockedByHero === 'true';
         select.classList.toggle('opacity-50', enabled);
         select.classList.toggle('cursor-not-allowed', enabled);
 
-        const fieldShell = select.closest('label, .flex');
+        [enchants.left, enchants.right].forEach((enchant) => {
+            if (! enchant) {
+                return;
+            }
+
+            if (enabled) {
+                enchant.value = '';
+            }
+
+            enchant.disabled = enabled || enchant.dataset.lockedByHero === 'true';
+            enchant.classList.toggle('opacity-50', enabled);
+            enchant.classList.toggle('cursor-not-allowed', enabled);
+
+            const enchantShell = enchant.closest('label');
+            enchantShell?.classList.toggle('opacity-50', enabled || enchant.dataset.lockedByHero === 'true');
+            enchantShell?.classList.toggle('grayscale', enabled || enchant.dataset.lockedByHero === 'true');
+        });
+
+        const fieldShell = select.closest('label, [data-inventory-row]');
         if (fieldShell) {
             fieldShell.classList.toggle('opacity-50', enabled || select.dataset.lockedByHero === 'true');
             fieldShell.classList.toggle('grayscale', enabled || select.dataset.lockedByHero === 'true');
@@ -260,26 +366,29 @@ if (catalog && root) {
 
             if (! first.value && second.dataset.twoHandMirror === 'true') {
                 second.value = '';
+                clearItemEnchantFields(second);
                 setSecondHandMirror(second, false);
                 return;
             }
 
             if (isTwoHanded(second.value) && second.value !== first.value && second.dataset.twoHandMirror !== 'true') {
-                moveItemToInventory(card, first.value);
-                first.value = second.value;
-                second.value = first.value;
+                moveItemToInventory(card, itemBundleForSelect(first));
+                setItemBundle(first, itemBundleForSelect(second));
+                setItemBundle(second, itemBundleForSelect(first));
             }
 
             if (isTwoHanded(first.value)) {
                 if (second.value && second.value !== first.value) {
-                    moveItemToInventory(card, second.value);
+                    moveItemToInventory(card, itemBundleForSelect(second));
                 }
 
                 second.value = first.value;
+                clearItemEnchantFields(second);
                 setSecondHandMirror(second, true);
             } else {
                 if (second.dataset.twoHandMirror === 'true') {
                     second.value = '';
+                    clearItemEnchantFields(second);
                 }
 
                 setSecondHandMirror(second, false);
@@ -396,7 +505,7 @@ if (catalog && root) {
 
             all('[data-needs-hero]', card).forEach((control) => {
                 const inventorySelect = control.matches('[data-rekup]')
-                    ? control.closest('.flex')?.querySelector('select[data-filter="item"]')
+                    ? control.closest('[data-inventory-row]')?.querySelector('select[data-filter="item"]')
                     : null;
                 const alwaysRekup = itemAlwaysRekup(inventorySelect?.value);
 
@@ -409,7 +518,7 @@ if (catalog && root) {
                 control.classList.toggle('cursor-not-allowed', ! hero);
                 control.classList.toggle('opacity-50', ! hero || alwaysRekup);
 
-                const fieldShell = control.closest('label, .flex');
+                const fieldShell = control.closest('label, [data-inventory-row]');
                 if (fieldShell) {
                     fieldShell.classList.toggle('opacity-50', ! hero || alwaysRekup);
                     fieldShell.classList.toggle('grayscale', ! hero || alwaysRekup);
@@ -421,7 +530,7 @@ if (catalog && root) {
             let armorWeight = 0;
 
             all('select[name*="[inventory]"][data-filter="item"]', card).forEach((select) => {
-                const row = select.closest('.flex');
+                const row = select.closest('[data-inventory-row]');
                 const isRekup = row?.querySelector('[data-rekup]')?.checked;
                 inventoryWeight += isRekup ? 1 : Number(itemByIndex[select.value]?.weight || 0);
             });
@@ -446,7 +555,7 @@ if (catalog && root) {
 
         all('[data-character]').forEach((card) => {
             all('select[name*="[inventory]"][data-filter="item"]', card).forEach((select) => {
-                const row = select.closest('.flex');
+                const row = select.closest('[data-inventory-row]');
                 if (! row?.querySelector('[data-rekup]')?.checked) {
                     return;
                 }
@@ -473,7 +582,7 @@ if (catalog && root) {
                 return;
             }
 
-            const row = select.closest('.flex');
+            const row = select.closest('[data-inventory-row]');
             const isInventory = select.name.includes('[inventory]');
             owned.push({
                 key: `${card.dataset.character}|${select.name}`,
@@ -532,7 +641,7 @@ if (catalog && root) {
 
         return all('select[name*="[inventory]"][data-filter="item"]', card)
             .map((select) => {
-                const row = select.closest('.flex');
+                const row = select.closest('[data-inventory-row]');
                 const item = itemByIndex[select.value];
 
                 return {
@@ -669,20 +778,11 @@ if (catalog && root) {
         all('[data-character]').forEach((card) => {
             const selects = all('select[name*="[inventory]"][data-filter="item"]', card);
             const rows = selects
-                .map((select) => ({
-                    item: select.value,
-                    rekup: Boolean(rekupCheckboxFor(select)?.checked),
-                }))
+                .map((select) => itemBundleForSelect(select))
                 .filter((row) => row.item);
 
             selects.forEach((select, index) => {
-                const rekup = rekupCheckboxFor(select);
-                const row = rows[index] || { item: '', rekup: false };
-
-                select.value = row.item;
-                if (rekup) {
-                    rekup.checked = row.item ? itemAlwaysRekup(row.item) || row.rekup : false;
-                }
+                setItemBundle(select, rows[index] || null);
             });
         });
     };
@@ -699,11 +799,7 @@ if (catalog && root) {
                 return;
             }
 
-            const rekup = rekupCheckboxFor(card.select);
-            card.select.value = '';
-            if (rekup) {
-                rekup.checked = false;
-            }
+            setItemBundle(card.select, null);
         });
 
         compactInventories();
@@ -1132,7 +1228,7 @@ if (catalog && root) {
 
     const isInventorySelect = (select) => select?.name.includes('[inventory]');
 
-    const rekupCheckboxFor = (select) => select?.closest('.flex')?.querySelector('[data-rekup]') || null;
+    const rekupCheckboxFor = (select) => select?.closest('[data-inventory-row]')?.querySelector('[data-rekup]') || null;
 
     const isRekupInventoryItem = (select) => Boolean(isInventorySelect(select) && rekupCheckboxFor(select)?.checked);
 
@@ -1143,21 +1239,52 @@ if (catalog && root) {
                 return;
             }
 
+            const empty = ! select.value;
             const locked = itemAlwaysRekup(select.value);
             if (locked) {
                 rekup.checked = true;
-            } else if (! select.value) {
+            } else if (empty) {
                 rekup.checked = false;
             }
 
-            rekup.disabled = locked || rekup.dataset.lockedByHero === 'true';
+            const disabled = empty || locked || rekup.dataset.lockedByHero === 'true';
+            rekup.disabled = disabled;
             rekup.title = locked ? 'This item is always used as rekup.' : '';
 
-            const fieldShell = rekup.closest('label, .flex');
+            const fieldShell = rekup.closest('label, [data-inventory-row]');
             if (fieldShell) {
-                fieldShell.classList.toggle('opacity-50', locked || rekup.dataset.lockedByHero === 'true');
-                fieldShell.classList.toggle('grayscale', locked || rekup.dataset.lockedByHero === 'true');
+                fieldShell.classList.toggle('opacity-50', disabled);
+                fieldShell.classList.toggle('grayscale', disabled);
             }
+        });
+    };
+
+    const refreshItemEnchantLocks = () => {
+        all('select[data-filter="item"]').forEach((select) => {
+            const lockedByHero = select.dataset.lockedByHero === 'true';
+            const mirrored = select.dataset.twoHandMirror === 'true';
+            const emptyInventory = isInventorySelect(select) && ! select.value;
+            const alwaysRekupInventory = isInventorySelect(select) && itemAlwaysRekup(select.value);
+            const enchants = enchantSelectsForItemSelect(select);
+
+            [enchants.left, enchants.right].forEach((enchant) => {
+                if (! enchant) {
+                    return;
+                }
+
+                if (emptyInventory || mirrored || alwaysRekupInventory) {
+                    enchant.value = '';
+                }
+
+                const disabled = lockedByHero || emptyInventory || mirrored || alwaysRekupInventory;
+                enchant.disabled = disabled;
+                enchant.classList.toggle('opacity-50', disabled);
+                enchant.classList.toggle('cursor-not-allowed', disabled);
+
+                const shell = enchant.closest('label');
+                shell?.classList.toggle('opacity-50', disabled);
+                shell?.classList.toggle('grayscale', disabled);
+            });
         });
     };
 
@@ -1222,34 +1349,11 @@ if (catalog && root) {
     };
 
     const swapItemSelects = (source, destination) => {
-        const sourceValue = source.value;
-        const destinationValue = destination.value;
-        const sourceRekup = rekupCheckboxFor(source);
-        const destinationRekup = rekupCheckboxFor(destination);
-        const sourceRekupChecked = Boolean(sourceRekup?.checked);
-        const destinationRekupChecked = Boolean(destinationRekup?.checked);
+        const sourceBundle = itemBundleForSelect(source);
+        const destinationBundle = itemBundleForSelect(destination);
 
-        source.value = destinationValue;
-        destination.value = sourceValue;
-
-        if (isInventorySelect(source) && isInventorySelect(destination)) {
-            sourceRekup.checked = destinationValue ? (itemAlwaysRekup(destinationValue) || destinationRekupChecked) : false;
-            destinationRekup.checked = sourceValue ? (itemAlwaysRekup(sourceValue) || sourceRekupChecked) : false;
-        } else if (! isInventorySelect(source) && isInventorySelect(destination)) {
-            destinationRekup.checked = itemAlwaysRekup(sourceValue);
-        }
-
-        if (isInventorySelect(source) && ! isInventorySelect(destination)) {
-            sourceRekup.checked = false;
-        }
-
-        [source, destination].forEach((select) => {
-            if (isInventorySelect(select) && ! select.value) {
-                rekupCheckboxFor(select).checked = false;
-            } else if (isInventorySelect(select) && itemAlwaysRekup(select.value)) {
-                rekupCheckboxFor(select).checked = true;
-            }
-        });
+        setItemBundle(source, destinationBundle);
+        setItemBundle(destination, sourceBundle);
 
         source.dispatchEvent(new Event('change', { bubbles: true }));
         destination.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1421,6 +1525,7 @@ if (catalog && root) {
         refreshHeroPanels();
         clearEmptyInventoryRekup();
         refreshAlwaysRekupLocks();
+        refreshItemEnchantLocks();
         refreshResourcesAndUpgrades();
         refreshCampaignCount();
         refreshItemTooltips();

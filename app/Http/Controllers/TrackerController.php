@@ -59,6 +59,8 @@ class TrackerController extends Controller
             'characters.*.inventory' => ['array'],
             'characters.*.inventory.*.item' => ['nullable', 'string'],
             'characters.*.inventory.*.rekup' => ['nullable', 'boolean'],
+            'characters.*.inventory.*.left_enchant' => ['nullable', 'string'],
+            'characters.*.inventory.*.right_enchant' => ['nullable', 'string'],
             'campaign' => ['array'],
             'campaign.*' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string'],
@@ -91,6 +93,8 @@ class TrackerController extends Controller
                 $state['characters'][$slot]['inventory'][$index] = [
                     'item' => $item,
                     'rekup' => $item !== '' && ($alwaysRekup || (bool) ($incoming['inventory'][$index]['rekup'] ?? false)),
+                    'left_enchant' => $item !== '' && ! $alwaysRekup ? ($incoming['inventory'][$index]['left_enchant'] ?? '') : '',
+                    'right_enchant' => $item !== '' && ! $alwaysRekup ? ($incoming['inventory'][$index]['right_enchant'] ?? '') : '',
                 ];
             }
 
@@ -123,22 +127,38 @@ class TrackerController extends Controller
         $secondHand = $character['equipment']['hand_item_2'] ?? '';
 
         if ($this->itemHands($secondHand) >= 2 && $secondHand !== $firstHand) {
-            $this->moveToInventory($character, $firstHand);
+            $this->moveToInventory(
+                $character,
+                $firstHand,
+                $character['equipment']['hand_item_1_left_enchant'] ?? '',
+                $character['equipment']['hand_item_1_right_enchant'] ?? '',
+            );
             $firstHand = $secondHand;
+            $character['equipment']['hand_item_1_left_enchant'] = $character['equipment']['hand_item_2_left_enchant'] ?? '';
+            $character['equipment']['hand_item_1_right_enchant'] = $character['equipment']['hand_item_2_right_enchant'] ?? '';
         }
 
         if ($this->itemHands($firstHand) >= 2) {
             if ($secondHand && $secondHand !== $firstHand) {
-                $this->moveToInventory($character, $secondHand);
+                $this->moveToInventory(
+                    $character,
+                    $secondHand,
+                    $character['equipment']['hand_item_2_left_enchant'] ?? '',
+                    $character['equipment']['hand_item_2_right_enchant'] ?? '',
+                );
             }
 
             $character['equipment']['hand_item_1'] = $firstHand;
             $character['equipment']['hand_item_2'] = $firstHand;
+            $character['equipment']['hand_item_2_left_enchant'] = '';
+            $character['equipment']['hand_item_2_right_enchant'] = '';
             return;
         }
 
         if ($firstHand && $secondHand === $firstHand) {
             $character['equipment']['hand_item_2'] = '';
+            $character['equipment']['hand_item_2_left_enchant'] = '';
+            $character['equipment']['hand_item_2_right_enchant'] = '';
         }
     }
 
@@ -147,7 +167,7 @@ class TrackerController extends Controller
         return (int) Arr::get($this->catalog->item($itemIndex), 'hands', 0);
     }
 
-    private function moveToInventory(array &$character, ?string $itemIndex): void
+    private function moveToInventory(array &$character, ?string $itemIndex, string $leftEnchant = '', string $rightEnchant = ''): void
     {
         if (! $itemIndex) {
             return;
@@ -155,7 +175,13 @@ class TrackerController extends Controller
 
         foreach ($character['inventory'] as &$row) {
             if (($row['item'] ?? '') === '') {
-                $row = ['item' => $itemIndex, 'rekup' => $this->itemAlwaysRekup($itemIndex)];
+                $alwaysRekup = $this->itemAlwaysRekup($itemIndex);
+                $row = [
+                    'item' => $itemIndex,
+                    'rekup' => $alwaysRekup,
+                    'left_enchant' => $alwaysRekup ? '' : $leftEnchant,
+                    'right_enchant' => $alwaysRekup ? '' : $rightEnchant,
+                ];
                 return;
             }
         }
@@ -167,6 +193,13 @@ class TrackerController extends Controller
             foreach ($character['inventory'] as &$row) {
                 if ($this->itemAlwaysRekup($row['item'] ?? null)) {
                     $row['rekup'] = true;
+                    $row['left_enchant'] = '';
+                    $row['right_enchant'] = '';
+                }
+
+                if (($row['item'] ?? '') === '') {
+                    $row['left_enchant'] = '';
+                    $row['right_enchant'] = '';
                 }
             }
         }

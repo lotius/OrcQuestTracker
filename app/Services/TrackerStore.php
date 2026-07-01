@@ -122,9 +122,16 @@ class TrackerStore
                         'armor_left_enchant' => '',
                         'armor_item' => '',
                         'armor_right_enchant' => '',
+                        'artifact_left_enchant' => '',
                         'artifact_item' => '',
+                        'artifact_right_enchant' => '',
                     ],
-                    'inventory' => collect(range(1, 15))->map(fn () => ['item' => '', 'rekup' => false])->all(),
+                    'inventory' => collect(range(1, 15))->map(fn () => [
+                        'item' => '',
+                        'rekup' => false,
+                        'left_enchant' => '',
+                        'right_enchant' => '',
+                    ])->all(),
                 ],
             ])->all(),
             'campaign' => [],
@@ -192,6 +199,15 @@ class TrackerStore
 
             unset($equipment['hand_left_enchant'], $equipment['hand_right_enchant']);
             $character['equipment'] = array_replace($this->defaults()['characters']['1']['equipment'], $equipment);
+
+            foreach ($character['inventory'] as &$row) {
+                $row = array_replace([
+                    'item' => '',
+                    'rekup' => false,
+                    'left_enchant' => '',
+                    'right_enchant' => '',
+                ], $row);
+            }
         }
 
         return $state;

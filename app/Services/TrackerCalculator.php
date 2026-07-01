@@ -122,9 +122,16 @@ class TrackerCalculator
 
     public function unusedEnchants(array $state, string $side): Collection
     {
-        $used = collect($state['characters'])->flatMap(fn (array $character) => collect($character['equipment'])
-            ->filter(fn ($value, string $key) => str_contains($key, 'enchant') && $value)
-        )->all();
+        $used = collect($state['characters'])->flatMap(function (array $character) {
+            $equipment = collect($character['equipment'])
+                ->filter(fn ($value, string $key) => str_contains($key, 'enchant') && $value);
+
+            $inventory = collect($character['inventory'] ?? [])
+                ->flatMap(fn (array $row) => [$row['left_enchant'] ?? '', $row['right_enchant'] ?? ''])
+                ->filter();
+
+            return $equipment->merge($inventory);
+        })->all();
 
         return $this->catalog->enchantOptions($side)
             ->reject(fn (array $option) => in_array($option['value'], $used, true))
