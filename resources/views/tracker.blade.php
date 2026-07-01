@@ -236,35 +236,43 @@
 
                         <div class="{{ $sectionTitle }}">Weapons, Armor, Enchants</div>
                         <div class="grid gap-2 md:grid-cols-2 2xl:grid-cols-4">
-                            <label>
-                                <span class="{{ $label }}">Hand left enchant</span>
-                                <select class="{{ $control }}" name="characters[{{ $slot }}][equipment][hand_left_enchant]" data-filter="enchant" data-enchant-side="left" data-needs-hero @disabled(! $selectedHero)>
-                                    <option value="">None</option>
-                                    @foreach ($leftEnchants as $option)
-                                        <option value="{{ $option['value'] }}" @selected($character['equipment']['hand_left_enchant'] === $option['value'])>{{ $option['label'] }}</option>
-                                    @endforeach
-                                </select>
-                            </label>
-                            @foreach (['hand_item_1' => 'Hand item 1', 'hand_item_2' => 'Hand item 2'] as $key => $labelText)
-                                <label>
-                                    <span class="{{ $label }}">{{ $labelText }}</span>
-                                    <select class="{{ $control }}" name="characters[{{ $slot }}][equipment][{{ $key }}]" data-filter="item" data-needs-hero @disabled(! $selectedHero)>
-                                        <option value="">None</option>
-                                        @foreach ($items as $item)
-                                            <option value="{{ $item['index'] }}" @selected($character['equipment'][$key] === $item['index'])>{{ $item['index'] }}</option>
-                                        @endforeach
-                                    </select>
-                                </label>
+                            @foreach ([
+                                'hand_item_1' => 'Hand item 1',
+                                'hand_item_2' => 'Hand item 2',
+                            ] as $handKey => $labelText)
+                                <div class="rounded-md border border-slate-200 bg-slate-50 p-3 2xl:col-span-2">
+                                    <div class="mb-2 text-sm font-black text-emerald-950">{{ $labelText }}</div>
+                                    <div class="grid gap-2 md:grid-cols-3">
+                                        <label>
+                                            <span class="{{ $label }}">Left enchant</span>
+                                            <select class="{{ $control }}" name="characters[{{ $slot }}][equipment][{{ $handKey }}_left_enchant]" data-filter="enchant" data-enchant-side="left" data-needs-hero @disabled(! $selectedHero)>
+                                                <option value="">None</option>
+                                                @foreach ($leftEnchants as $option)
+                                                    <option value="{{ $option['value'] }}" @selected(($character['equipment'][$handKey.'_left_enchant'] ?? '') === $option['value'])>{{ $option['label'] }}</option>
+                                                @endforeach
+                                            </select>
+                                        </label>
+                                        <label>
+                                            <span class="{{ $label }}">Item</span>
+                                            <select class="{{ $control }}" name="characters[{{ $slot }}][equipment][{{ $handKey }}]" data-filter="item" data-needs-hero @disabled(! $selectedHero)>
+                                                <option value="">None</option>
+                                                @foreach ($items as $item)
+                                                    <option value="{{ $item['index'] }}" @selected($character['equipment'][$handKey] === $item['index'])>{{ $item['index'] }}</option>
+                                                @endforeach
+                                            </select>
+                                        </label>
+                                        <label>
+                                            <span class="{{ $label }}">Right enchant</span>
+                                            <select class="{{ $control }}" name="characters[{{ $slot }}][equipment][{{ $handKey }}_right_enchant]" data-filter="enchant" data-enchant-side="right" data-needs-hero @disabled(! $selectedHero)>
+                                                <option value="">None</option>
+                                                @foreach ($rightEnchants as $option)
+                                                    <option value="{{ $option['value'] }}" @selected(($character['equipment'][$handKey.'_right_enchant'] ?? '') === $option['value'])>{{ $option['label'] }}</option>
+                                                @endforeach
+                                            </select>
+                                        </label>
+                                    </div>
+                                </div>
                             @endforeach
-                            <label>
-                                <span class="{{ $label }}">Hand right enchant</span>
-                                <select class="{{ $control }}" name="characters[{{ $slot }}][equipment][hand_right_enchant]" data-filter="enchant" data-enchant-side="right" data-needs-hero @disabled(! $selectedHero)>
-                                    <option value="">None</option>
-                                    @foreach ($rightEnchants as $option)
-                                        <option value="{{ $option['value'] }}" @selected($character['equipment']['hand_right_enchant'] === $option['value'])>{{ $option['label'] }}</option>
-                                    @endforeach
-                                </select>
-                            </label>
                             <label>
                                 <span class="{{ $label }}">Armor left enchant</span>
                                 <select class="{{ $control }}" name="characters[{{ $slot }}][equipment][armor_left_enchant]" data-filter="enchant" data-enchant-side="left" data-needs-hero @disabled(! $selectedHero)>

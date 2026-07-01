@@ -67,7 +67,41 @@ Hero-specific skill choices update automatically when a hero is selected.
 
 Inventory and equipment item selectors are filtered so the same item card cannot be assigned to multiple places at once.
 
-Inventory items can be dragged between inventory slots and equipment slots. When items are moved, their rekup state is preserved where appropriate.
+Each hand item has its own enchant slots:
+
+- Hand item 1 left enchant
+- Hand item 1 right enchant
+- Hand item 2 left enchant
+- Hand item 2 right enchant
+
+Armor keeps its own left and right enchant slots. This lets two one-handed items each track their own enchant pair instead of sharing one hand enchant pair across both weapons.
+
+Inventory slots include a `Rekup` toggle. Turning this on means the card is being broken down for its rekup resources instead of being kept as usable gear. Rekuped cards contribute their listed wood, metal, leather, and gold values to the shared Rekup Pool on the Resources & Upgrades tab.
+
+Use the Rekup toggle when:
+
+- a character is carrying a card only to break it down
+- you want its resources counted toward available upgrades
+- you want the kraft planner to treat it as part of the current payment pool
+
+Leave Rekup off when:
+
+- the item is still being carried or equipped for use
+- you do not want its resources counted yet
+- you are still deciding whether to spend it
+
+Items marked as rekup count as 1 inventory weight instead of their printed item weight.
+
+Some cards are automatically locked into Rekup status because they are not meaningful inventory/equipment choices in this tracker. These include resource-only cards, gold cards, and potions:
+
+- Gold Nuggets
+- Gold Teeth
+- Resources cards, such as `Resources - 1 Metal`
+- Potion cards, such as `Potion of Usoholi`
+
+These cards appear with the Rekup checkbox already checked and disabled. This prevents accidentally treating them as normal gear and ensures their resources or spent-card status is handled consistently.
+
+Inventory items can be dragged between inventory slots and equipment slots. When items are moved, their rekup state is preserved where appropriate. Always-rekup items stay checked and locked even after being moved.
 
 Two-handed item handling is automatic:
 
@@ -84,16 +118,7 @@ The Resources & Upgrades tab shows the current pooled rekup totals:
 - leather
 - gold
 
-These totals come from inventory items marked as rekup.
-
-Some cards are always treated as rekup and cannot be unchecked:
-
-- Gold Nuggets
-- Gold Teeth
-- Resources cards, such as `Resources - 1 Metal`
-- Potion cards, such as `Potion of Usoholi`
-
-Always-rekup items appear checked and greyed out in the UI, and the server enforces that state when saving.
+These totals come from inventory items marked as rekup, including always-rekup cards that are checked and locked automatically.
 
 ## Weight Warnings
 

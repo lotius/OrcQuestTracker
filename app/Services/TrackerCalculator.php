@@ -122,7 +122,9 @@ class TrackerCalculator
 
     public function unusedEnchants(array $state, string $side): Collection
     {
-        $used = collect($state['characters'])->flatMap(fn (array $character) => collect($character['equipment'])->filter())->all();
+        $used = collect($state['characters'])->flatMap(fn (array $character) => collect($character['equipment'])
+            ->filter(fn ($value, string $key) => str_contains($key, 'enchant') && $value)
+        )->all();
 
         return $this->catalog->enchantOptions($side)
             ->reject(fn (array $option) => in_array($option['value'], $used, true))
@@ -132,7 +134,7 @@ class TrackerCalculator
     private function ownedItems(array $character): Collection
     {
         $equipment = collect($character['equipment'] ?? [])
-            ->filter(fn ($value, string $key) => str_contains($key, 'item') && $value)
+            ->filter(fn ($value, string $key) => in_array($key, ['hand_item_1', 'hand_item_2', 'armor_item', 'artifact_item'], true) && $value)
             ->reject(fn ($value, string $key) => $key === 'hand_item_2' && $value === Arr::get($character, 'equipment.hand_item_1'))
             ->map(fn ($index, string $key) => ['index' => $index, 'location' => str($key)->replace('_', ' ')->title()->toString(), 'rekup' => false]);
 

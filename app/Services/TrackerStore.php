@@ -19,7 +19,7 @@ class TrackerStore
             $campaignId = array_key_first($file['campaigns']);
         }
 
-        return array_replace_recursive($this->defaults(), $file['campaigns'][$campaignId]['state'] ?? []);
+        return $this->normalizeState($file['campaigns'][$campaignId]['state'] ?? []);
     }
 
     public function save(string $campaignId, array $state, string $name): string
@@ -29,7 +29,7 @@ class TrackerStore
 
         $file['campaigns'][$campaignId] = [
             'name' => trim($name) !== '' ? trim($name) : 'Untitled Campaign',
-            'state' => array_replace_recursive($this->defaults(), $state),
+            'state' => $this->normalizeState($state),
             'updated_at' => now()->toDateTimeString(),
         ];
         $file['active_campaign_id'] = $campaignId;
@@ -46,7 +46,7 @@ class TrackerStore
 
         $file['campaigns'][$campaignId] = [
             'name' => trim($name) !== '' ? trim($name) : 'Untitled Campaign',
-            'state' => array_replace_recursive($this->defaults(), $state),
+            'state' => $this->normalizeState($state),
             'updated_at' => now()->toDateTimeString(),
         ];
         $file['active_campaign_id'] = $campaignId;
@@ -113,10 +113,12 @@ class TrackerStore
                     'hero_id' => '',
                     'skills' => ['10' => [], '20' => [], '30' => []],
                     'equipment' => [
-                        'hand_left_enchant' => '',
+                        'hand_item_1_left_enchant' => '',
                         'hand_item_1' => '',
+                        'hand_item_1_right_enchant' => '',
+                        'hand_item_2_left_enchant' => '',
                         'hand_item_2' => '',
-                        'hand_right_enchant' => '',
+                        'hand_item_2_right_enchant' => '',
                         'armor_left_enchant' => '',
                         'armor_item' => '',
                         'armor_right_enchant' => '',
@@ -144,7 +146,7 @@ class TrackerStore
                 'campaigns' => [
                     self::DEFAULT_CAMPAIGN_ID => [
                         'name' => 'Default Campaign',
-                        'state' => array_replace_recursive($this->defaults(), $saved),
+                        'state' => $this->normalizeState($saved),
                         'updated_at' => now()->toDateTimeString(),
                     ],
                 ],
@@ -171,6 +173,28 @@ class TrackerStore
     private function saveFile(array $file): void
     {
         Storage::put(self::PATH, json_encode($file, JSON_PRETTY_PRINT));
+    }
+
+    private function normalizeState(array $state): array
+    {
+        $state = array_replace_recursive($this->defaults(), $state);
+
+        foreach ($state['characters'] as &$character) {
+            $equipment = $character['equipment'] ?? [];
+
+            if (! empty($equipment['hand_left_enchant']) && empty($equipment['hand_item_1_left_enchant'])) {
+                $equipment['hand_item_1_left_enchant'] = $equipment['hand_left_enchant'];
+            }
+
+            if (! empty($equipment['hand_right_enchant']) && empty($equipment['hand_item_1_right_enchant'])) {
+                $equipment['hand_item_1_right_enchant'] = $equipment['hand_right_enchant'];
+            }
+
+            unset($equipment['hand_left_enchant'], $equipment['hand_right_enchant']);
+            $character['equipment'] = array_replace($this->defaults()['characters']['1']['equipment'], $equipment);
+        }
+
+        return $state;
     }
 
     private function uniqueCampaignId(string $name, array $file): string
