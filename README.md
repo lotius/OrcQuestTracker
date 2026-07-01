@@ -1,58 +1,279 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# OrcQuest Upgrade Tracker
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+OrcQuest Upgrade Tracker is a local Laravel/Vite app for tracking an OrcQuest campaign party, inventory, rekup resources, upgrade readiness, quest progress, and kraft planning.
 
-## About Laravel
+The app is built for campaign-night use: update characters as items move around, let auto-save preserve the tracker, and use the kraft planner to choose exactly which inventory cards should be consumed for upgrades.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Running The App
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+Install dependencies if needed:
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
+npm install
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Start the local development server:
 
-## Contributing
+```bash
+composer run dev
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Open the app:
 
-## Code of Conduct
+```text
+http://127.0.0.1:8000
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Build frontend assets:
 
-## Security Vulnerabilities
+```bash
+npm run build
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Run tests:
 
-## License
+```bash
+php artisan test
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Main Tabs
+
+The tracker is split into three tabs:
+
+- `Characters`: party sheets, heroes, skills, equipment, inventory, and rekup flags.
+- `Resources & Upgrades`: rekup pool totals, eligible upgrades, and the kraft planner.
+- `Campaign`: campaign name, quest checklist, and notes.
+
+The active tab is remembered in the browser.
+
+## Characters
+
+The Characters tab supports up to six character slots.
+
+Each character tracks:
+
+- player name
+- selected hero
+- hero icon, class, health, and starting items
+- skill cards purchased at 10, 20, and 30 badass points
+- hand items, armor, artifact item, and enchants
+- 15 inventory slots
+- rekup status for inventory items
+
+Hero-specific skill choices update automatically when a hero is selected.
+
+## Inventory And Equipment
+
+Inventory and equipment item selectors are filtered so the same item card cannot be assigned to multiple places at once.
+
+Inventory items can be dragged between inventory slots and equipment slots. When items are moved, their rekup state is preserved where appropriate.
+
+Two-handed item handling is automatic:
+
+- selecting a two-handed item mirrors it into both hand slots
+- conflicting hand items are moved into the first available inventory slot when possible
+- the second hand slot is locked while mirrored
+
+## Rekup Pool
+
+The Resources & Upgrades tab shows the current pooled rekup totals:
+
+- wood
+- metal
+- leather
+- gold
+
+These totals come from inventory items marked as rekup.
+
+Some cards are always treated as rekup and cannot be unchecked:
+
+- Gold Nuggets
+- Gold Teeth
+- Resources cards, such as `Resources - 1 Metal`
+- Potion cards, such as `Potion of Usoholi`
+
+Always-rekup items appear checked and greyed out in the UI, and the server enforces that state when saving.
+
+## Weight Warnings
+
+Each character card shows inventory, hands, and armor weight totals.
+
+Badges turn red when a character exceeds their hero's limit:
+
+- `Inv`
+- `Hands`
+- `Armor`
+
+Items marked as rekup count as 1 inventory weight.
+
+## Eligible Upgrades
+
+The Eligible Upgrades panel lists owned upgradeable items that can currently be upgraded using the pooled rekup resources.
+
+Each row shows:
+
+- item card
+- character and location
+- kraft cost
+
+This list updates live as inventory and rekup choices change.
+
+## Kraft Planner
+
+The Kraft Planner helps choose exact inventory cards to consume when paying for an upgrade.
+
+Use it by selecting:
+
+1. `Upgrade Target`: an owned upgradeable item.
+2. `Strategy`: how the payment should be optimized.
+
+The planner shows:
+
+- target item
+- current resource pool
+- kraft cost
+- missing resources
+- suggested payment resources
+- wasted resources
+- exact cards to consume
+
+The `Missing now` row turns red when the target cannot be paid from the current rekup pool.
+
+## Kraft Strategies
+
+Strategies decide which exact cards should be consumed.
+
+`Least amount of wasted resources`
+
+Finds the payment closest to the kraft cost. If multiple options waste the same amount, it prefers fewer cards.
+
+`Retain the most wood`
+
+Avoids consuming cards that generate wood when possible.
+
+`Retain the most metal`
+
+Avoids consuming cards that generate metal when possible.
+
+`Retain the most leather`
+
+Avoids consuming cards that generate leather when possible.
+
+`Retain the most gold`
+
+Avoids consuming cards that generate gold when possible.
+
+The `?` button beside Strategy opens a modal explaining these options.
+
+## Consuming Payment Cards
+
+After the kraft planner suggests payment cards, click:
+
+```text
+Consume Payment Cards
+```
+
+This will:
+
+- remove the suggested payment cards from their inventory slots
+- leave the target upgrade item in place
+- compact each character's inventory so remaining items move into the earliest slots
+- refresh resources and upgrade availability
+- auto-save the result
+
+## Campaign Tracking
+
+The Campaign tab tracks quest progress by quest book:
+
+- Core Quest Book
+- Gorbag's Tales
+- Sewer Fever
+- Royal Mines
+- Elven Vestiges
+- Beast in the Woods
+- Blood for Blood
+- Death Crypt
+- The Bacon & Eggs Conspiracy
+- Greedy & Doomed
+- A Shadow Over Ratsmouth
+- Wings & Claws
+
+The Campaign tab also includes freeform notes for campaign memory.
+
+## Campaign Management
+
+The header includes campaign controls:
+
+- campaign selector
+- `Load`
+- `Reset`
+- `Save Tracker`
+
+The bottom of the form includes:
+
+- `Save As New Campaign`
+
+Campaigns are stored locally in Laravel storage as JSON.
+
+## Auto-Save
+
+The tracker auto-saves shortly after edits.
+
+The header shows current save status:
+
+- `Auto-save ready`
+- `Unsaved changes...`
+- `Saving...`
+- `Saved [time]`
+- failure message if save fails
+
+The manual `Save Tracker` button remains available as a safety fallback.
+
+## Undo And Redo
+
+The header includes tracker-wide:
+
+- `Undo`
+- `Redo`
+
+Undo/redo tracks the last 25 browser-session actions across the full tracker form, including:
+
+- character choices
+- skills
+- equipment
+- inventory
+- rekup flags
+- quest checks
+- notes
+- campaign name
+- consume-payment-card actions
+
+Restoring an undo/redo state refreshes derived values and auto-saves the restored tracker state.
+
+## Data Source
+
+Catalog data lives in:
+
+```text
+resources/data/orcquest.json
+```
+
+That file contains:
+
+- heroes
+- items
+- enchants
+- campaign quests
+
+Item metadata powers weight calculations, rekup values, kraft costs, upgrade eligibility, always-rekup behavior, and the kraft planner.
+
+## Tech Stack
+
+- Laravel
+- Blade
+- Vite
+- Tailwind CSS
+- Vanilla JavaScript
+
+No database is required for the current tracker state; campaign data is persisted to local JSON storage.
