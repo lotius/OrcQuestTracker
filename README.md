@@ -2,7 +2,7 @@
 
 The "Skill Cards Purchased", "Weapons, Armor, Enchants", and "Inventory Items" sections need to be more visually distinct.
 
-Also, I want each section to be an openable tray. So that each character card can be condensed down to just some basic information when not actively viewing that character's information.
+Also, I want each section to be an openable tray. So that each character card can be condensed down to just some basic information when not actively viewing that character's information. Each tray, while closed, can simply show a summary of information.
 
 # OrcQuest Upgrade Tracker
 
