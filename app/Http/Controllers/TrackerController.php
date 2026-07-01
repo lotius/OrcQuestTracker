@@ -27,6 +27,7 @@ class TrackerController extends Controller
 
         $activeCampaignId = $this->store->activeCampaignId();
         $state = $this->store->load($activeCampaignId);
+        $this->normalizeAlwaysRekup($state);
 
         return view('tracker', [
             'state' => $state,
@@ -85,10 +86,11 @@ class TrackerController extends Controller
 
             foreach ($state['characters'][$slot]['inventory'] as $index => $row) {
                 $item = $incoming['inventory'][$index]['item'] ?? '';
+                $alwaysRekup = $this->itemAlwaysRekup($item);
 
                 $state['characters'][$slot]['inventory'][$index] = [
                     'item' => $item,
-                    'rekup' => $item !== '' && (bool) ($incoming['inventory'][$index]['rekup'] ?? false),
+                    'rekup' => $item !== '' && ($alwaysRekup || (bool) ($incoming['inventory'][$index]['rekup'] ?? false)),
                 ];
             }
 
@@ -153,9 +155,25 @@ class TrackerController extends Controller
 
         foreach ($character['inventory'] as &$row) {
             if (($row['item'] ?? '') === '') {
-                $row = ['item' => $itemIndex, 'rekup' => false];
+                $row = ['item' => $itemIndex, 'rekup' => $this->itemAlwaysRekup($itemIndex)];
                 return;
             }
         }
+    }
+
+    private function normalizeAlwaysRekup(array &$state): void
+    {
+        foreach ($state['characters'] as &$character) {
+            foreach ($character['inventory'] as &$row) {
+                if ($this->itemAlwaysRekup($row['item'] ?? null)) {
+                    $row['rekup'] = true;
+                }
+            }
+        }
+    }
+
+    private function itemAlwaysRekup(?string $itemIndex): bool
+    {
+        return (bool) Arr::get($this->catalog->item($itemIndex), 'always_rekup', false);
     }
 }

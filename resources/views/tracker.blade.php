@@ -13,6 +13,7 @@
         $control = 'min-h-10 w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15';
         $button = 'min-h-11 rounded-md bg-emerald-800 px-5 text-sm font-extrabold text-white hover:bg-emerald-950';
         $ghostButton = 'min-h-11 rounded-md border border-slate-500 px-5 text-sm font-extrabold text-white hover:bg-white/10';
+        $headerToolButton = 'min-h-11 rounded-md border border-slate-500 bg-slate-950 px-5 text-sm font-extrabold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40';
         $sectionTitle = 'mb-2 mt-5 text-xs font-black uppercase text-emerald-950';
     @endphp
 
@@ -38,6 +39,12 @@
                 <input type="hidden" name="campaign_id" value="{{ $activeCampaignId }}">
                 <button class="{{ $ghostButton }}" type="submit">Reset</button>
             </form>
+            <div class="flex flex-wrap items-center gap-2 border-t border-slate-700 pt-3 md:border-l md:border-t-0 md:pl-3 md:pt-0">
+                <span class="rounded-md bg-white/10 px-3 py-2 text-xs font-extrabold text-emerald-200" data-save-status>Auto-save ready</span>
+                <button class="{{ $headerToolButton }}" type="button" data-undo disabled>Undo</button>
+                <button class="{{ $headerToolButton }}" type="button" data-redo disabled>Redo</button>
+                <button class="{{ $button }}" type="submit" form="tracker-form" name="intent" value="save">Save Tracker</button>
+            </div>
         </div>
     </header>
 
@@ -46,16 +53,18 @@
             @csrf
             <input type="hidden" name="campaign_id" value="{{ $activeCampaignId }}">
 
-            <section class="grid gap-3 xl:grid-cols-[1fr_1.35fr]">
+            <div class="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white p-2 shadow-[0_12px_28px_rgba(15,23,42,0.06)]" data-tabs>
+                <button class="min-h-10 rounded-md bg-emerald-800 px-4 text-sm font-extrabold text-white" type="button" data-tab="characters" aria-pressed="true">Characters</button>
+                <button class="min-h-10 rounded-md px-4 text-sm font-extrabold text-emerald-950 hover:bg-emerald-50" type="button" data-tab="resources" aria-pressed="false">Resources & Upgrades</button>
+                <button class="min-h-10 rounded-md px-4 text-sm font-extrabold text-emerald-950 hover:bg-emerald-50" type="button" data-tab="campaign" aria-pressed="false">Campaign</button>
+            </div>
+
+            <section class="grid gap-3 xl:grid-cols-[1fr_1.35fr]" data-tab-panel="resources" hidden>
                 <div class="{{ $panel }}">
                     <div class="mb-3 flex items-center justify-between gap-3 font-black">
                         <span>Rekup Pool</span>
                         <small class="font-bold text-slate-500">Totals from inventory marked rekup</small>
                     </div>
-                    <label class="mb-3 block">
-                        <span class="{{ $label }}">Campaign Name</span>
-                        <input class="{{ $control }}" name="campaign_name" value="{{ $activeCampaignName }}">
-                    </label>
                     <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                         @foreach (['wood', 'metal', 'leather', 'gold'] as $resource)
                             <div class="min-h-20 rounded-md border border-slate-200 bg-slate-50 p-3">
@@ -88,13 +97,54 @@
                         @endforelse
                     </div>
                 </div>
+
+                <div class="{{ $panel }} xl:col-span-2">
+                    <div class="mb-3 flex items-center justify-between gap-3 font-black">
+                        <span>Kraft Planner</span>
+                        <small class="font-bold text-slate-500">Find whole-card rekup payments with less waste</small>
+                    </div>
+                    <div class="grid gap-3 lg:grid-cols-[1fr_0.55fr]">
+                        <label>
+                            <span class="{{ $label }} flex min-h-5 items-center">Upgrade Target</span>
+                            <select class="{{ $control }}" data-kraft-target>
+                                <option value="">Choose an owned upgradeable item</option>
+                            </select>
+                        </label>
+                        <label>
+                            <span class="{{ $label }} flex min-h-5 items-center gap-1">
+                                Strategy
+                                <button class="grid h-5 w-5 place-items-center rounded-full border border-slate-300 bg-slate-50 text-xs font-black text-slate-600 hover:border-emerald-700 hover:text-emerald-800" type="button" data-modal-open="strategy-help" aria-label="Show strategy help">?</button>
+                            </span>
+                            <select class="{{ $control }}" data-kraft-strategy>
+                                <option value="least_waste">Least amount of wasted resources</option>
+                                <option value="retain_wood">Retain the most wood</option>
+                                <option value="retain_gold">Retain the most gold</option>
+                                <option value="retain_metal">Retain the most metal</option>
+                                <option value="retain_leather">Retain the most leather</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="mt-4 grid gap-3 lg:grid-cols-[0.8fr_1.2fr]">
+                        <div class="rounded-md border border-slate-200 bg-slate-50 p-3" data-kraft-summary>
+                            <p class="text-sm font-bold text-slate-500">Choose a target to plan a kraft.</p>
+                        </div>
+                        <div class="rounded-md border border-slate-200 bg-slate-50 p-3" data-kraft-suggestion>
+                            <p class="text-sm font-bold text-slate-500">Exact payment cards will appear here.</p>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="mb-2 flex items-center justify-between gap-3 font-black">
+                            <span>Almost Craftable</span>
+                            <small class="font-bold text-slate-500">Owned upgrades that need more rekup</small>
+                        </div>
+                        <div class="grid gap-2 md:grid-cols-2 xl:grid-cols-3" data-almost-craftable>
+                            <p class="text-sm font-bold text-slate-500">Almost-craftable items will appear here.</p>
+                        </div>
+                    </div>
+                </div>
             </section>
 
-            <div class="pointer-events-none sticky top-2 z-10 my-3 flex justify-end">
-                <button class="{{ $button }} pointer-events-auto shadow-lg shadow-emerald-950/20" type="submit">Save Tracker</button>
-            </div>
-
-            <section class="grid gap-4">
+            <section class="grid gap-4" data-tab-panel="characters">
                 @foreach ($state['characters'] as $slot => $character)
                     @php
                         $summary = $summaries[$slot];
@@ -256,6 +306,7 @@
                         <div class="{{ $sectionTitle }}">Inventory Items</div>
                         <div class="grid gap-2 md:grid-cols-2 2xl:grid-cols-3">
                             @foreach ($character['inventory'] as $index => $row)
+                                @php $inventoryItem = $items->firstWhere('index', $row['item']); @endphp
                                 <div class="flex items-center gap-2">
                                     <select class="{{ $control }}" name="characters[{{ $slot }}][inventory][{{ $index }}][item]" data-filter="item" data-needs-hero @disabled(! $selectedHero)>
                                         <option value="">Empty</option>
@@ -264,7 +315,7 @@
                                         @endforeach
                                     </select>
                                     <label class="grid min-w-20 grid-cols-[18px_auto] items-center gap-1 text-xs font-extrabold text-slate-500">
-                                        <input class="h-4 w-4 accent-emerald-800 disabled:cursor-not-allowed disabled:opacity-40" type="checkbox" name="characters[{{ $slot }}][inventory][{{ $index }}][rekup]" value="1" @checked($row['rekup']) data-rekup data-needs-hero @disabled(! $selectedHero)>
+                                        <input class="h-4 w-4 accent-emerald-800 disabled:cursor-not-allowed disabled:opacity-40" type="checkbox" name="characters[{{ $slot }}][inventory][{{ $index }}][rekup]" value="1" @checked($row['rekup'] || ($inventoryItem['always_rekup'] ?? false)) data-rekup data-needs-hero @disabled(! $selectedHero || ($inventoryItem['always_rekup'] ?? false))>
                                         <span>Rekup</span>
                                     </label>
                                 </div>
@@ -274,12 +325,16 @@
                 @endforeach
             </section>
 
-            <section class="mt-4 grid gap-4 xl:grid-cols-[1.4fr_0.6fr]">
+            <section class="mt-4 grid gap-4 xl:grid-cols-[1.4fr_0.6fr]" data-tab-panel="campaign" hidden>
                 <div class="{{ $panel }} min-w-0">
                     <div class="mb-3 flex items-center justify-between gap-3 font-black">
                         <span>Campaign</span>
                         <small class="font-bold text-slate-500"><span data-campaign-count>{{ collect($state['campaign'])->filter()->count() }}</span> completed</small>
                     </div>
+                    <label class="mb-4 block">
+                        <span class="{{ $label }}">Campaign Name</span>
+                        <input class="{{ $control }}" name="campaign_name" value="{{ $activeCampaignName }}">
+                    </label>
                     <div class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                         @foreach ($campaignQuests as $group => $quests)
                             <div>
@@ -306,11 +361,25 @@
             </section>
 
             <div class="mt-5 flex flex-col gap-2 md:flex-row md:justify-end">
-                <button class="{{ $button }} min-w-56" type="submit" name="intent" value="save">Save Tracker</button>
                 <button class="min-h-11 rounded-md border border-emerald-800 px-5 text-sm font-extrabold text-emerald-950 hover:bg-emerald-50" type="submit" name="intent" value="save_as">Save As New Campaign</button>
             </div>
         </form>
     </main>
+    <div class="fixed inset-0 z-50 hidden bg-slate-950/70 p-4" data-modal="strategy-help" role="dialog" aria-modal="true" aria-labelledby="strategy-help-title">
+        <div class="mx-auto mt-20 w-[min(620px,100%)] rounded-lg border border-slate-200 bg-white p-5 shadow-2xl" data-modal-card>
+            <div class="mb-4 flex items-center justify-between gap-3">
+                <h2 class="text-xl font-black" id="strategy-help-title">Kraft Strategy Help</h2>
+                <button class="grid h-9 w-9 place-items-center rounded-md border border-slate-300 text-lg font-black text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700" type="button" data-modal-close aria-label="Close strategy help">x</button>
+            </div>
+            <div class="grid gap-3 text-sm font-bold text-slate-600">
+                <p><strong class="text-slate-950">Least amount of wasted resources:</strong> finds the closest payment to the kraft cost, then uses fewer cards when multiple payments waste the same amount.</p>
+                <p><strong class="text-slate-950">Retain the most wood:</strong> avoids consuming cards that generate wood when possible.</p>
+                <p><strong class="text-slate-950">Retain the most metal:</strong> avoids consuming cards that generate metal when possible.</p>
+                <p><strong class="text-slate-950">Retain the most leather:</strong> avoids consuming cards that generate leather when possible.</p>
+                <p><strong class="text-slate-950">Retain the most gold:</strong> avoids consuming cards that generate gold when possible.</p>
+            </div>
+        </div>
+    </div>
     <script>
         window.orcQuestCatalog = {{ Illuminate\Support\Js::from([
             'heroes' => $heroes->values(),

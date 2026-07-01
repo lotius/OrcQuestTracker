@@ -1951,6 +1951,7 @@
                       "code":  "WP 116",
                       "name":  "Gold Nuggets",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -1972,6 +1973,7 @@
                       "code":  "WP 117",
                       "name":  "Gold Nuggets",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -1993,6 +1995,7 @@
                       "code":  "WP 111",
                       "name":  "Gold Teeth",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -2014,6 +2017,7 @@
                       "code":  "WP 112",
                       "name":  "Gold Teeth",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -2035,6 +2039,7 @@
                       "code":  "WP 113",
                       "name":  "Gold Teeth",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -2056,6 +2061,7 @@
                       "code":  "WP 114",
                       "name":  "Gold Teeth",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -3358,6 +3364,7 @@
                       "code":  "WP 102",
                       "name":  "Resources - 1 Leather",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -3379,6 +3386,7 @@
                       "code":  "WP 103",
                       "name":  "Resources - 1 Leather",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -3400,6 +3408,7 @@
                       "code":  "WP 108",
                       "name":  "Resources - 1 Metal",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -3421,6 +3430,7 @@
                       "code":  "WP 109",
                       "name":  "Resources - 1 Metal",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -3442,6 +3452,7 @@
                       "code":  "WP 105",
                       "name":  "Resources - 1 Wood",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -3463,6 +3474,7 @@
                       "code":  "WP 106",
                       "name":  "Resources - 1 Wood",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -3484,6 +3496,7 @@
                       "code":  "WP 104",
                       "name":  "Resources - 2 Leather",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -3505,6 +3518,7 @@
                       "code":  "WP 110",
                       "name":  "Resources - 2 Metal",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -3526,6 +3540,7 @@
                       "code":  "WP 107",
                       "name":  "Resources - 2 Wood",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -4954,6 +4969,7 @@
                       "code":  "WP 118",
                       "name":  "Potion of Unothere",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -4975,6 +4991,7 @@
                       "code":  "WP 119",
                       "name":  "Potion of Usoholi",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -4996,6 +5013,7 @@
                       "code":  "WP 120",
                       "name":  "Potion of Usotuff",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -5017,6 +5035,7 @@
                       "code":  "WP 121",
                       "name":  "Potion of Usomad",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -5038,6 +5057,7 @@
                       "code":  "WP 122",
                       "name":  "Potion of Donoturt",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -5059,6 +5079,7 @@
                       "code":  "WP 123",
                       "name":  "Potion of Donoturt",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -5080,6 +5101,7 @@
                       "code":  "WP 124",
                       "name":  "Potion of Usoqwik",
                       "can_upgrade":  false,
+                      "always_rekup":  true,
                       "kraft":  {
                                     "wood":  0,
                                     "metal":  0,
@@ -6074,215 +6096,47 @@
                      }
                  ],
     "campaign_quests":  [
-                            {
-                                "group":  "A Shadow Over Ratsmouth",
-                                "quest":  "Quest 1",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "A Shadow Over Ratsmouth",
-                                "quest":  "Quest 1",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "A Shadow Over Ratsmouth",
-                                "quest":  "Quest 1",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "A Shadow Over Ratsmouth",
-                                "quest":  "Quest 1",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "A Shadow Over Ratsmouth",
-                                "quest":  "Quest 2",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "A Shadow Over Ratsmouth",
-                                "quest":  "Quest 2",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "A Shadow Over Ratsmouth",
-                                "quest":  "Quest 2",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "A Shadow Over Ratsmouth",
-                                "quest":  "Quest 2",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "A Shadow Over Ratsmouth",
-                                "quest":  "Quest 3",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "A Shadow Over Ratsmouth",
-                                "quest":  "Quest 3",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "A Shadow Over Ratsmouth",
-                                "quest":  "Quest 3",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "A Shadow Over Ratsmouth",
-                                "quest":  "Quest 3",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Wings \u0026 Claws",
-                                "quest":  "Quest 1",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Wings \u0026 Claws",
-                                "quest":  "Quest 1",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Wings \u0026 Claws",
-                                "quest":  "Quest 1",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Wings \u0026 Claws",
-                                "quest":  "Quest 1 - Varrek the Gargoyle",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Wings \u0026 Claws",
-                                "quest":  "Quest 2",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Wings \u0026 Claws",
-                                "quest":  "Quest 2",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Wings \u0026 Claws",
-                                "quest":  "Quest 2",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Wings \u0026 Claws",
-                                "quest":  "Quest 2 - The Tarrasque",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Wings \u0026 Claws",
-                                "quest":  "Quest 3",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Wings \u0026 Claws",
-                                "quest":  "Quest 3",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Wings \u0026 Claws",
-                                "quest":  "Quest 3",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "The Bacon \u0026 Eggs Conspiracy",
-                                "quest":  "Quest 1",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "The Bacon \u0026 Eggs Conspiracy",
-                                "quest":  "Quest 1",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "The Bacon \u0026 Eggs Conspiracy",
-                                "quest":  "Quest 1",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "The Bacon \u0026 Eggs Conspiracy",
-                                "quest":  "Quest 2",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "The Bacon \u0026 Eggs Conspiracy",
-                                "quest":  "Quest 2",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "The Bacon \u0026 Eggs Conspiracy",
-                                "quest":  "Quest 2",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "The Bacon \u0026 Eggs Conspiracy",
-                                "quest":  "Quest 3",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "The Bacon \u0026 Eggs Conspiracy",
-                                "quest":  "Quest 3",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "The Bacon \u0026 Eggs Conspiracy",
-                                "quest":  "Quest 3",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "The Bacon \u0026 Eggs Conspiracy",
-                                "quest":  "Final Quest",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Greedy \u0026 Doomed",
-                                "quest":  "Sewer Fever",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Greedy \u0026 Doomed",
-                                "quest":  "Quest 1",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Greedy \u0026 Doomed",
-                                "quest":  "Quest 1 - Abgral the Troll",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Greedy \u0026 Doomed",
-                                "quest":  "Beast in the Woods",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Greedy \u0026 Doomed",
-                                "quest":  "Quest 2",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Greedy \u0026 Doomed",
-                                "quest":  "Quest 2 - Cthul\u0027Orc",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Greedy \u0026 Doomed",
-                                "quest":  "Blood for Blood",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Greedy \u0026 Doomed",
-                                "quest":  "Quest 3",
-                                "status":  "Not Completed"
-                            },
-                            {
-                                "group":  "Greedy \u0026 Doomed",
-                                "quest":  "Elven Vestiges",
-                                "status":  "Not Completed"
-                            }
+                            {"group": "Core Quest Book", "quest": "Chapter 1 - Quest 1", "status": "Not Completed"},
+                            {"group": "Core Quest Book", "quest": "Chapter 1 - Quest 2", "status": "Not Completed"},
+                            {"group": "Core Quest Book", "quest": "Chapter 1 - Quest 3", "status": "Not Completed"},
+                            {"group": "Core Quest Book", "quest": "Chapter 2 - Quest 1", "status": "Not Completed"},
+                            {"group": "Core Quest Book", "quest": "Chapter 2 - Quest 2", "status": "Not Completed"},
+                            {"group": "Core Quest Book", "quest": "Chapter 2 - Quest 3", "status": "Not Completed"},
+                            {"group": "Core Quest Book", "quest": "Chapter 3 - Quest 1", "status": "Not Completed"},
+                            {"group": "Core Quest Book", "quest": "Chapter 3 - Quest 2", "status": "Not Completed"},
+                            {"group": "Core Quest Book", "quest": "Chapter 3 - Quest 3", "status": "Not Completed"},
+                            {"group": "Core Quest Book", "quest": "Chapter 3 - Final Quest", "status": "Not Completed"},
+                            {"group": "Gorbag's Tales", "quest": "Sewer Fever", "status": "Not Completed"},
+                            {"group": "Gorbag's Tales", "quest": "Beast in the Woods", "status": "Not Completed"},
+                            {"group": "Gorbag's Tales", "quest": "Blood for Blood", "status": "Not Completed"},
+                            {"group": "Gorbag's Tales", "quest": "Elven Vestiges", "status": "Not Completed"},
+                            {"group": "Sewer Fever", "quest": "Quest 1", "status": "Not Completed"},
+                            {"group": "Sewer Fever", "quest": "Quest 2", "status": "Not Completed"},
+                            {"group": "Sewer Fever", "quest": "Quest 3", "status": "Not Completed"},
+                            {"group": "Royal Mines", "quest": "Quest 1", "status": "Not Completed"},
+                            {"group": "Royal Mines", "quest": "Quest 2", "status": "Not Completed"},
+                            {"group": "Royal Mines", "quest": "Quest 3", "status": "Not Completed"},
+                            {"group": "Elven Vestiges", "quest": "Quest 1", "status": "Not Completed"},
+                            {"group": "Elven Vestiges", "quest": "Quest 2", "status": "Not Completed"},
+                            {"group": "Elven Vestiges", "quest": "Quest 3", "status": "Not Completed"},
+                            {"group": "Beast in the Woods", "quest": "Quest 1", "status": "Not Completed"},
+                            {"group": "Beast in the Woods", "quest": "Quest 2", "status": "Not Completed"},
+                            {"group": "Beast in the Woods", "quest": "Quest 3", "status": "Not Completed"},
+                            {"group": "Blood for Blood", "quest": "Quest 1", "status": "Not Completed"},
+                            {"group": "Blood for Blood", "quest": "Quest 2", "status": "Not Completed"},
+                            {"group": "Blood for Blood", "quest": "Quest 3", "status": "Not Completed"},
+                            {"group": "Death Crypt", "quest": "Quest 1", "status": "Not Completed"},
+                            {"group": "Death Crypt", "quest": "Quest 2", "status": "Not Completed"},
+                            {"group": "Death Crypt", "quest": "Quest 3", "status": "Not Completed"},
+                            {"group": "The Bacon & Eggs Conspiracy", "quest": "Quest 1", "status": "Not Completed"},
+                            {"group": "The Bacon & Eggs Conspiracy", "quest": "Quest 2", "status": "Not Completed"},
+                            {"group": "The Bacon & Eggs Conspiracy", "quest": "Quest 3", "status": "Not Completed"},
+                            {"group": "Greedy & Doomed", "quest": "Quest 1 - Abgral the Troll", "status": "Not Completed"},
+                            {"group": "Greedy & Doomed", "quest": "Quest 2 - CThul'Orc", "status": "Not Completed"},
+                            {"group": "A Shadow Over Ratsmouth", "quest": "Quest 1", "status": "Not Completed"},
+                            {"group": "A Shadow Over Ratsmouth", "quest": "Quest 2", "status": "Not Completed"},
+                            {"group": "A Shadow Over Ratsmouth", "quest": "Quest 3", "status": "Not Completed"},
+                            {"group": "Wings & Claws", "quest": "Quest 1 - Varrek the Gargoyle", "status": "Not Completed"},
+                            {"group": "Wings & Claws", "quest": "Quest 2 - The Tarrasque", "status": "Not Completed"}
                         ]
 }

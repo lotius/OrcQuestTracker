@@ -20,12 +20,14 @@ class TrackerCalculator
         $ownedItems = $this->ownedItems($character);
 
         foreach ($character['inventory'] ?? [] as $row) {
-            if (($row['rekup'] ?? false) === true) {
+            $item = $this->catalog->item($row['item'] ?? null);
+
+            if (($row['rekup'] ?? false) === true || ($item['always_rekup'] ?? false) === true) {
                 $inventoryWeight += 1;
                 continue;
             }
 
-            $inventoryWeight += (int) Arr::get($this->catalog->item($row['item'] ?? null), 'weight', 0);
+            $inventoryWeight += (int) Arr::get($item, 'weight', 0);
         }
 
         foreach (['hand_item_1', 'hand_item_2'] as $key) {
@@ -60,11 +62,12 @@ class TrackerCalculator
             $row = ['wood' => 0, 'metal' => 0, 'leather' => 0, 'gold' => 0];
 
             foreach ($character['inventory'] ?? [] as $inventoryRow) {
-                if (! ($inventoryRow['rekup'] ?? false)) {
+                $item = $this->catalog->item($inventoryRow['item'] ?? null);
+
+                if (! (($inventoryRow['rekup'] ?? false) || ($item['always_rekup'] ?? false) === true)) {
                     continue;
                 }
 
-                $item = $this->catalog->item($inventoryRow['item'] ?? null);
                 foreach ($row as $resource => $amount) {
                     $row[$resource] += (int) Arr::get($item, "rekup.$resource", 0);
                 }
@@ -135,7 +138,11 @@ class TrackerCalculator
 
         $inventory = collect($character['inventory'] ?? [])
             ->filter(fn (array $row) => ! empty($row['item']))
-            ->map(fn (array $row, int $index) => ['index' => $row['item'], 'location' => 'Inventory '.($index + 1), 'rekup' => (bool) ($row['rekup'] ?? false)]);
+            ->map(fn (array $row, int $index) => [
+                'index' => $row['item'],
+                'location' => 'Inventory '.($index + 1),
+                'rekup' => (bool) ($row['rekup'] ?? false) || (bool) Arr::get($this->catalog->item($row['item'] ?? null), 'always_rekup', false),
+            ]);
 
         return $equipment->merge($inventory)->values();
     }
