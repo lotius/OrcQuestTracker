@@ -1,1 +1,19 @@
 @import "tailwindcss";
+
+@font-face {
+    font-family: "Metal Mania";
+    src: url("/fonts/metalmania-regular.ttf") format("truetype");
+    font-display: swap;
+}
+
+html {
+    font-size: 18px;
+}
+
+body,
+button,
+input,
+select,
+textarea {
+    font-family: "Metal Mania", ui-sans-serif, system-ui, sans-serif;
+}

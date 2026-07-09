@@ -13,6 +13,7 @@ if (catalog && root) {
     const value = (element) => element?.value || '';
     const enchantCode = (enchantValue) => enchantValue.split(' - ')[0] || '';
     const resourceNames = ['wood', 'metal', 'leather', 'gold'];
+    const resourceIconSrc = Object.fromEntries(resourceNames.map((resource) => [resource, `/images/icons/${resource}-resource.png`]));
     const saveStatusNodes = all('[data-save-status], [data-save-status-secondary]');
     const activeTabClasses = 'min-h-10 rounded-md bg-emerald-800 px-4 text-sm font-extrabold text-white';
     const inactiveTabClasses = 'min-h-10 rounded-md px-4 text-sm font-extrabold text-emerald-950 hover:bg-emerald-50';
@@ -466,6 +467,60 @@ if (catalog && root) {
         badge.classList.toggle('text-emerald-950', ! over);
     };
 
+    const plural = (count, singular, pluralLabel = `${singular}s`) => `${count} ${count === 1 ? singular : pluralLabel}`;
+
+    const setTraySummary = (card, tray, text) => {
+        const summary = card.querySelector(`[data-tray-summary="${tray}"]`);
+        if (summary) {
+            summary.textContent = text;
+        }
+    };
+
+    const refreshTraySummaries = (card) => {
+        const skillCounts = ['10', '20', '30'].map((tier) => ({
+            tier,
+            count: all(`select[data-skill-tier="${tier}"]`, card).filter((select) => select.value).length,
+        }));
+        const totalSkills = skillCounts.reduce((total, tier) => total + tier.count, 0);
+        setTraySummary(
+            card,
+            'skills',
+            totalSkills
+                ? `${plural(totalSkills, 'card')} / ${skillCounts.map((tier) => `${tier.tier} BP: ${tier.count}`).join(' / ')}`
+                : 'No skills purchased',
+        );
+
+        const firstHand = value(handSelect(card, 'hand_item_1')) || 'None';
+        const secondHandSelect = handSelect(card, 'hand_item_2');
+        const secondHand = secondHandSelect?.dataset.twoHandMirror === 'true'
+            ? 'Mirrored'
+            : (value(secondHandSelect) || 'None');
+        const armor = value(card.querySelector('select[name$="[armor_item]"]')) || 'None';
+        const artifact = value(card.querySelector('select[name$="[artifact_item]"]')) || 'None';
+        const enchantCount = all('select[data-filter="enchant"]', card).filter((select) => select.value).length;
+        const equippedCount = [firstHand, secondHand, armor, artifact].filter((item) => ! ['None', 'Mirrored'].includes(item)).length;
+        setTraySummary(
+            card,
+            'equipment',
+            equippedCount
+                ? `Hands: ${firstHand} / ${secondHand} / Armor: ${armor} / Artifact: ${artifact} / ${plural(enchantCount, 'enchant')}`
+                : 'No equipment selected',
+        );
+
+        const inventoryRows = all('[data-inventory-row]', card);
+        const filledRows = inventoryRows.filter((row) => value(row.querySelector('select[data-filter="item"]')));
+        const rekupRows = filledRows.filter((row) => row.querySelector('[data-rekup]')?.checked);
+        const carriedRows = filledRows.length - rekupRows.length;
+        const emptyRows = inventoryRows.length - filledRows.length;
+        setTraySummary(
+            card,
+            'inventory',
+            filledRows.length
+                ? `${plural(carriedRows, 'carried item')} / ${plural(rekupRows.length, 'rekup card')} / ${plural(emptyRows, 'empty slot')}`
+                : 'No inventory items',
+        );
+    };
+
     const refreshHeroPanels = () => {
         all('[data-character]').forEach((card) => {
             const hero = heroById[value(card.querySelector('[data-hero-select]'))];
@@ -547,6 +602,7 @@ if (catalog && root) {
             setWeightBadge(card.querySelector('[data-weight="inventory"]'), 'Inv', inventoryWeight, Number(hero?.inventory_weight_limit || 0));
             setWeightBadge(card.querySelector('[data-weight="hands"]'), 'Hands', handWeight, Number(hero?.hand_weight_limit || 0));
             setWeightBadge(card.querySelector('[data-weight="armor"]'), 'Armor', armorWeight, Number(hero?.armor_weight_limit || 0));
+            refreshTraySummaries(card);
         });
     };
 
@@ -612,16 +668,41 @@ if (catalog && root) {
         resourceNames.map((resource) => [resource, Math.max(0, Number(left[resource] || 0) - Number(right[resource] || 0))])
     );
 
-    const resourceText = (bag) => resourceNames
-        .map((resource) => `${resource[0].toUpperCase()} ${Number(bag?.[resource] || 0)}`)
-        .join(' / ');
+    const resourceIcon = (resource, sizeClass = 'h-4 w-4') => {
+        const icon = document.createElement('img');
+        icon.className = `${sizeClass} object-contain`;
+        icon.src = resourceIconSrc[resource];
+        icon.alt = `${resource.charAt(0).toUpperCase()}${resource.slice(1)} resource icon`;
+        icon.title = resource;
 
-    const missingText = (missing) => {
-        const rows = resourceNames
-            .filter((resource) => Number(missing[resource] || 0) > 0)
-            .map((resource) => `${missing[resource]} ${resource}`);
+        return icon;
+    };
 
-        return rows.length ? rows.join(', ') : 'Nothing missing';
+    const resourceAmountNode = (resource, amount, tone = 'text-slate-600') => {
+        const node = document.createElement('span');
+        node.className = `inline-flex items-center gap-1 whitespace-nowrap ${tone}`;
+        node.append(resourceIcon(resource), document.createTextNode(String(Number(amount || 0))));
+
+        return node;
+    };
+
+    const appendResourceAmounts = (node, bag, options = {}) => {
+        const resources = options.onlyPositive
+            ? resourceNames.filter((resource) => Number(bag?.[resource] || 0) > 0)
+            : resourceNames;
+
+        if (! resources.length) {
+            node.append(document.createTextNode(options.emptyText || 'Nothing missing'));
+            return;
+        }
+
+        resources.forEach((resource, index) => {
+            if (index > 0) {
+                node.append(document.createTextNode(' / '));
+            }
+
+            node.append(resourceAmountNode(resource, bag?.[resource] || 0, options.tone || 'text-slate-600'));
+        });
     };
 
     const allOwnedUpgradeableItems = () => all('[data-character]').flatMap((card) => {
@@ -826,15 +907,15 @@ if (catalog && root) {
 
         const cost = resourceBag(target.item.kraft);
         const rows = [
-            ['Target', `${target.item.index} - ${target.character} / ${target.location}`],
-            ['Current pool', resourceText(resources)],
-            ['Kraft cost', resourceText(cost)],
-            ['Missing now', missingText(plan.missing)],
-            ['Suggested payment', resourceText(plan.resources)],
-            ['Payment waste', resourceText(plan.waste)],
+            ['Target', { text: `${target.item.index} - ${target.character} / ${target.location}` }],
+            ['Current pool', { bag: resources }],
+            ['Kraft cost', { bag: cost }],
+            ['Missing now', { bag: plan.missing, onlyPositive: true, emptyText: 'Nothing missing' }],
+            ['Suggested payment', { bag: plan.resources }],
+            ['Payment waste', { bag: plan.waste }],
         ];
 
-        rows.forEach(([label, text]) => {
+        rows.forEach(([label, detail]) => {
             const hasMissingResources = label === 'Missing now'
                 && resourceNames.some((resource) => Number(plan.missing?.[resource] || 0) > 0);
             const row = document.createElement('div');
@@ -846,9 +927,17 @@ if (catalog && root) {
             title.textContent = label;
             const valueNode = document.createElement('span');
             valueNode.className = hasMissingResources
-                ? 'text-sm font-bold text-red-700'
-                : 'text-sm font-bold text-slate-900';
-            valueNode.textContent = text;
+                ? 'flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-red-700'
+                : 'flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-slate-900';
+            if (detail.text) {
+                valueNode.textContent = detail.text;
+            } else {
+                appendResourceAmounts(valueNode, detail.bag, {
+                    onlyPositive: detail.onlyPositive,
+                    emptyText: detail.emptyText,
+                    tone: hasMissingResources ? 'text-red-700' : 'text-slate-900',
+                });
+            }
             row.append(title, valueNode);
             summary.appendChild(row);
         });
@@ -897,8 +986,9 @@ if (catalog && root) {
             item.className = 'block';
             item.textContent = card.index;
             const meta = document.createElement('small');
-            meta.className = 'mt-1 block text-slate-500';
-            meta.textContent = `${card.character} / ${card.location} / ${resourceText(card.resources)}`;
+            meta.className = 'mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-500';
+            meta.append(document.createTextNode(`${card.character} / ${card.location} / `));
+            appendResourceAmounts(meta, card.resources);
             const status = document.createElement('span');
             status.className = card.rekup
                 ? 'w-max rounded-md bg-emerald-50 px-2 py-1 text-xs font-extrabold text-emerald-800'
@@ -942,8 +1032,9 @@ if (catalog && root) {
             meta.className = 'mt-1 block text-slate-500';
             meta.textContent = `${target.character} / ${target.location}`;
             const need = document.createElement('span');
-            need.className = 'mt-2 block text-xs font-extrabold text-amber-700';
-            need.textContent = `Missing ${missingText(missing)}`;
+            need.className = 'mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-extrabold text-amber-700';
+            need.append(document.createTextNode('Missing '));
+            appendResourceAmounts(need, missing, { onlyPositive: true, tone: 'text-amber-700' });
             card.append(title, meta, need);
             list.appendChild(card);
         });
@@ -1011,8 +1102,8 @@ if (catalog && root) {
                 location.className = 'text-slate-500';
                 location.textContent = `${upgrade.character} · ${upgrade.location}`;
                 const cost = document.createElement('small');
-                cost.className = 'text-slate-500';
-                cost.textContent = `W ${upgrade.item.kraft.wood} / M ${upgrade.item.kraft.metal} / L ${upgrade.item.kraft.leather} / G ${upgrade.item.kraft.gold}`;
+                cost.className = 'flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-500';
+                appendResourceAmounts(cost, upgrade.item.kraft);
 
                 row.append(title, location, cost);
                 list.appendChild(row);

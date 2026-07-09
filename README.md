@@ -1,11 +1,3 @@
-# Next Steps
-
-The "Skill Cards Purchased", "Weapons, Armor, Enchants", and "Inventory Items" sections need to be more visually distinct.
-
-Also, I want each section to be an openable tray. So that each character card can be condensed down to just some basic information when not actively viewing that character's information. Each tray, while closed, can simply show a summary of information.
-
-Provide instructions for users who want to run their own copy from scratch. How would a user who has never run a laravel project before get started? Install PHP, install NPM, install Composer, maybe offer options for DB? Local JSON storage or maybe a local MySQL/XAMPP?
-
 # OrcQuest Upgrade Tracker
 
 OrcQuest Upgrade Tracker is a local Laravel/Vite app for tracking an OrcQuest campaign party, inventory, rekup resources, upgrade readiness, quest progress, and kraft planning.
@@ -14,12 +6,55 @@ The app is built for campaign-night use: update characters as items move around,
 
 ## Running The App
 
-Install dependencies if needed:
+### First-Time Setup
+
+Install these tools first:
+
+- PHP 8.3 or newer
+- Composer
+- Node.js and npm
+
+On Windows, the simplest PHP path is usually Laravel Herd or XAMPP. Composer and Node.js can be installed from their official installers.
+
+Clone or download this project, then open a terminal in the project folder.
+
+Install PHP dependencies:
 
 ```bash
 composer install
+```
+
+Install frontend dependencies:
+
+```bash
 npm install
 ```
+
+Create your local Laravel environment file:
+
+```bash
+copy .env.example .env
+php artisan key:generate
+```
+
+This tracker stores campaign data as local JSON files through Laravel storage, so no database is required for normal use.
+
+If Laravel asks for a database during setup or testing, SQLite is the lightest local option:
+
+```bash
+type nul > database\database.sqlite
+```
+
+Then set these values in `.env`:
+
+```text
+DB_CONNECTION=sqlite
+DB_DATABASE=database/database.sqlite
+```
+
+MySQL through XAMPP, Herd, or another local server also works for Laravel's default tables, but it is not needed for tracker campaign storage.
+
+### Daily Development
 
 Start the local development server:
 
@@ -98,7 +133,7 @@ Leave Rekup off when:
 - you do not want its resources counted yet
 - you are still deciding whether to spend it
 
-Items marked as rekup count as 1 inventory weight instead of their printed item weight.
+Items cards marked as rekup count as 1 inventory weight instead of their printed item weight.
 
 Some cards are automatically locked into Rekup status because they are not meaningful inventory/equipment choices in this tracker. These include resource-only cards, gold cards, and potions:
 
