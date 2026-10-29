@@ -2,480 +2,517 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#173a22">
     <title>OrcQuest Upgrade Tracker</title>
+    <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
+    <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ asset('site.webmanifest') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="bg-slate-100 text-slate-900 antialiased">
+<body class="font-sans text-ink antialiased">
     @php
-        $panel = 'rounded-lg border border-slate-200 bg-white p-3 shadow-[0_10px_22px_rgba(15,23,42,0.055)] sm:p-4';
-        $label = 'mb-0.5 block text-[11px] font-extrabold uppercase text-slate-500';
-        $control = 'min-h-9 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15';
-        $button = 'min-h-10 rounded-md bg-emerald-800 px-3.5 text-sm font-extrabold text-white hover:bg-emerald-950 sm:px-4';
-        $ghostButton = 'min-h-10 rounded-md border border-slate-500 px-3.5 text-sm font-extrabold text-white hover:bg-white/10 sm:px-4';
-        $headerToolButton = 'min-h-10 rounded-md border border-slate-500 bg-slate-950 px-3.5 text-sm font-extrabold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40 sm:px-4';
-        $tray = 'group mt-4 overflow-hidden rounded-md border bg-white shadow-[0_10px_18px_rgba(15,23,42,0.04)]';
-        $traySummary = 'flex min-h-12 cursor-pointer list-none flex-col justify-center gap-1 px-3 py-2 marker:hidden sm:flex-row sm:items-center sm:justify-between [&::-webkit-details-marker]:hidden';
-        $trayTitle = 'text-[11px] font-black uppercase tracking-wide';
-        $trayMeta = 'text-xs font-extrabold text-slate-500 sm:text-right';
-        $trayBody = 'border-t p-3';
-        $resourceIcons = [
-            'wood' => 'images/icons/wood-resource.png',
-            'metal' => 'images/icons/metal-resource.png',
-            'leather' => 'images/icons/leather-resource.png',
-            'gold' => 'images/icons/gold-resource.png',
+        $resourceNames = ['wood', 'metal', 'leather', 'gold'];
+        $resourceIcons = collect($resourceNames)->mapWithKeys(fn ($resource) => [$resource => asset("images/icons/{$resource}-resource.png")]);
+        $healthColors = ['Red' => '#a8201a', 'Orange' => '#d9741c', 'Yellow' => '#d6b11c'];
+        $equipmentSlots = [
+            ['item' => 'hand_item_1', 'left' => 'hand_item_1_left_enchant', 'right' => 'hand_item_1_right_enchant', 'label' => 'Hand 1'],
+            ['item' => 'hand_item_2', 'left' => 'hand_item_2_left_enchant', 'right' => 'hand_item_2_right_enchant', 'label' => 'Hand 2'],
+            ['item' => 'armor_item', 'left' => 'armor_left_enchant', 'right' => 'armor_right_enchant', 'label' => 'Armor'],
+            ['item' => 'artifact_item', 'left' => 'artifact_left_enchant', 'right' => 'artifact_right_enchant', 'label' => 'Artifact'],
         ];
+        $activeSlots = collect($state['characters'])->filter(fn ($character) => $character['active'] ?? false)->keys();
+        $firstActiveSlot = $activeSlots->first();
     @endphp
 
-    <header class="mb-3 flex flex-col gap-3 border-b-4 border-emerald-800 bg-slate-950 px-3 py-3 text-white sm:px-4 md:flex-row md:items-center md:justify-between md:px-6">
-        <div>
-            <p class="text-xs font-extrabold uppercase text-emerald-300">OrcQuest</p>
-            <h1 class="text-2xl font-black leading-none sm:text-3xl md:text-4xl">Upgrade Tracker</h1>
-        </div>
-        <div class="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center md:justify-end">
-            @if (session('status'))
-                <span class="font-bold text-emerald-200">{{ session('status') }}</span>
-            @endif
-            <form class="flex items-center gap-2" method="get" action="{{ route('tracker.index') }}">
-                <select class="min-h-10 min-w-0 flex-1 rounded-md border border-slate-500 bg-slate-950 px-2.5 text-sm font-bold text-white md:flex-none" name="campaign_id" onchange="this.form.submit()">
-                    @foreach ($campaigns as $campaign)
-                        <option value="{{ $campaign['id'] }}" @selected($activeCampaignId === $campaign['id'])>{{ $campaign['name'] }}</option>
-                    @endforeach
-                </select>
-                <button class="{{ $ghostButton }}" type="submit">Load</button>
-            </form>
-            <form method="post" action="{{ route('tracker.reset') }}">
-                @csrf
-                <input type="hidden" name="campaign_id" value="{{ $activeCampaignId }}">
-                <button class="{{ $ghostButton }}" type="submit">Reset</button>
-            </form>
-            <div class="flex flex-wrap items-center gap-1.5 border-t border-slate-700 pt-2 md:border-l md:border-t-0 md:pl-3 md:pt-0">
-                <span class="rounded-md bg-white/10 px-2.5 py-1.5 text-xs font-extrabold text-emerald-200" data-save-status>Auto-save ready</span>
-                <button class="{{ $headerToolButton }}" type="button" data-undo disabled>Undo</button>
-                <button class="{{ $headerToolButton }}" type="button" data-redo disabled>Redo</button>
-                <button class="{{ $button }}" type="submit" form="tracker-form" name="intent" value="save">Save Tracker</button>
+    {{-- Header ----------------------------------------------------------------------------------- --}}
+    <header class="torn-bottom sticky top-0 z-40 bg-orc text-white shadow-[0_2px_10px_rgba(0,0,0,.25)]">
+        <div class="mx-auto flex h-14 max-w-[1600px] items-center gap-2 px-3 sm:gap-3 sm:px-4 lg:px-6">
+            <img class="size-9 shrink-0 drop-shadow" src="{{ asset('favicon.svg') }}" alt="">
+            <div class="min-w-0 leading-none">
+                <p class="hidden text-[10px] font-semibold uppercase tracking-[0.2em] text-sage sm:block">OrcQuest WarPath</p>
+                <h1 class="font-display truncate text-xl sm:text-2xl">Upgrade Tracker</h1>
+                <p class="mt-0.5 truncate text-[11px] text-white/60 sm:hidden" data-save-status-secondary>Auto-save ready</p>
+            </div>
+
+            <nav class="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-black/30 bg-orc pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_14px_rgba(0,0,0,.2)] md:static md:ml-4 md:flex md:gap-1 md:border-0 md:bg-transparent md:pb-0 md:shadow-none" data-tabs aria-label="Sections">
+                @foreach (['characters' => ['users', 'Characters'], 'resources' => ['hammer', 'Kraft & Rekup'], 'campaign' => ['map', 'Campaign'], 'history' => ['scroll', 'History']] as $tab => [$icon, $tabLabel])
+                    <button class="flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold text-white/60 transition-colors hover:text-white aria-pressed:text-white aria-pressed:shadow-[inset_0_3px_0_var(--color-sage)] md:flex-row md:gap-2 md:rounded-md md:px-3 md:text-sm md:hover:bg-white/10 md:aria-pressed:bg-white/15 md:aria-pressed:shadow-none" type="button" data-tab="{{ $tab }}" aria-pressed="{{ $tab === 'characters' ? 'true' : 'false' }}">
+                        <x-icon :name="$icon" class="size-5 md:size-4" />
+                        <span>{{ $tabLabel }}</span>
+                    </button>
+                @endforeach
+            </nav>
+
+            <div class="ml-auto flex items-center gap-1 sm:gap-1.5">
+                <span class="mr-1 hidden text-xs font-medium text-white/60 sm:inline" data-save-status>Auto-save ready</span>
+                <button class="icon-btn text-white hover:bg-white/10" type="button" data-undo disabled title="Undo" aria-label="Undo"><x-icon name="undo" /></button>
+                <button class="icon-btn text-white hover:bg-white/10" type="button" data-redo disabled title="Redo" aria-label="Redo"><x-icon name="redo" /></button>
+                <button class="btn btn-bone px-2.5 sm:px-3.5" type="submit" form="tracker-form" name="intent" value="save" title="Save tracker">
+                    <x-icon name="save" class="size-4" /><span class="hidden sm:inline">Save</span>
+                </button>
+                <details class="relative" data-menu>
+                    <summary class="icon-btn cursor-pointer list-none text-white hover:bg-white/10 [&::-webkit-details-marker]:hidden" aria-label="Campaign menu" title="Campaign menu"><x-icon name="more" /></summary>
+                    <div class="panel absolute right-0 top-full z-50 mt-2 grid w-[min(20rem,calc(100vw-1.5rem))] gap-3 p-3 text-ink">
+                        <form method="get" action="{{ route('tracker.index') }}">
+                            <label class="field-label" for="campaign-picker">Campaign</label>
+                            <div class="flex gap-2">
+                                <select class="control" id="campaign-picker" name="campaign_id" onchange="this.form.submit()">
+                                    @foreach ($campaigns as $campaign)
+                                        <option value="{{ $campaign['id'] }}" @selected($activeCampaignId === $campaign['id'])>{{ $campaign['name'] }}</option>
+                                    @endforeach
+                                </select>
+                                <button class="btn btn-outline" type="submit">Load</button>
+                            </div>
+                        </form>
+                        <div class="grid gap-1 border-t border-line pt-2">
+                            <button class="btn justify-start text-ink-soft hover:bg-paper-deep" type="submit" form="tracker-form" name="intent" value="save_as">
+                                <x-icon name="copy" class="size-4" /> Save as new campaign
+                            </button>
+                            <form method="post" action="{{ route('tracker.reset') }}" onsubmit="return confirm('Reset this campaign? All characters, quests and notes will be cleared.')">
+                                @csrf
+                                <input type="hidden" name="campaign_id" value="{{ $activeCampaignId }}">
+                                <button class="btn w-full justify-start text-danger hover:bg-danger/10" type="submit">
+                                    <x-icon name="refresh" class="size-4" /> Reset campaign
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </details>
             </div>
         </div>
     </header>
 
-    <main class="mx-auto mb-10 w-[min(1560px,calc(100%-12px))] sm:w-[min(1560px,calc(100%-20px))] md:w-[min(1560px,calc(100%-28px))]">
+    @if (session('status'))
+        <div class="toast fixed inset-x-0 top-[4.25rem] z-50 mx-auto w-max max-w-[90vw] rounded-full bg-orc-600 px-4 py-2 text-sm font-semibold text-white shadow-lg" role="status">{{ session('status') }}</div>
+    @endif
+
+    <main class="mx-auto max-w-[1600px] px-3 pb-28 pt-4 sm:px-4 md:pb-12 lg:px-6">
         <form id="tracker-form" method="post" action="{{ route('tracker.update') }}" data-tracker-root>
             @csrf
             <input type="hidden" name="campaign_id" value="{{ $activeCampaignId }}">
 
-            <div class="mb-2 flex flex-wrap items-center gap-1.5 rounded-md border border-slate-200 bg-white p-1.5 shadow-[0_10px_22px_rgba(15,23,42,0.055)]" data-tabs>
-                <button class="min-h-9 rounded-md bg-emerald-800 px-3 text-sm font-extrabold text-white" type="button" data-tab="characters" aria-pressed="true">Characters</button>
-                <button class="min-h-9 rounded-md px-3 text-sm font-extrabold text-emerald-950 hover:bg-emerald-50" type="button" data-tab="resources" aria-pressed="false">Resources & Upgrades</button>
-                <button class="min-h-9 rounded-md px-3 text-sm font-extrabold text-emerald-950 hover:bg-emerald-50" type="button" data-tab="campaign" aria-pressed="false">Campaign</button>
-            </div>
-
-            <section class="grid gap-3 xl:grid-cols-[1fr_1.35fr]" data-tab-panel="resources" hidden>
-                <div class="{{ $panel }}">
-                    <div class="mb-2 flex items-center justify-between gap-2 font-black">
-                        <span>Rekup Pool</span>
-                        <small class="font-bold text-slate-500">Totals from inventory marked rekup</small>
-                    </div>
-                    <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                        @foreach (['wood', 'metal', 'leather', 'gold'] as $resource)
-                            <div class="min-h-16 rounded-md border border-slate-200 bg-slate-50 p-2.5">
-                                <span class="flex items-center gap-1.5 text-xs font-extrabold text-slate-500">
-                                    <img class="h-5 w-5 object-contain" src="{{ asset($resourceIcons[$resource]) }}" alt="{{ ucfirst($resource) }} resource icon">
-                                    {{ ucfirst($resource) }}
+            {{-- Characters ------------------------------------------------------------------------ --}}
+            <section data-tab-panel="characters">
+                <div class="sticky top-[3.5rem] z-30 -mx-3 mb-3 bg-parchment/95 px-3 pb-2 pt-3 sm:-mx-4 sm:px-4 lg:-mx-6 lg:px-6">
+                    <div class="scrollbar-none flex items-center gap-1.5 overflow-x-auto" data-character-tabs>
+                        @foreach ($state['characters'] as $slot => $character)
+                            @php $chipHero = $summaries[$slot]['hero']; @endphp
+                            <button class="flex shrink-0 items-center gap-2 rounded-full border border-line bg-paper py-1 pl-1 pr-3 text-left text-ink shadow-sm transition-colors hover:border-orc-600 aria-pressed:border-orc aria-pressed:bg-orc aria-pressed:text-white" type="button" data-character-tab="{{ $slot }}" aria-pressed="{{ (string) $slot === (string) $firstActiveSlot ? 'true' : 'false' }}" @if (! ($character['active'] ?? false)) hidden @endif>
+                                <span class="relative">
+                                    <img class="size-8 rounded-full object-cover ring-1 ring-black/10" src="{{ $chipHero['icon'] ?? '' }}" alt="" data-chip-icon @if (! $chipHero) hidden @endif>
+                                    <span class="portrait-fallback size-8 place-items-center rounded-full bg-paper-deep text-muted"><x-icon name="skull" class="size-4" /></span>
+                                    <span class="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-danger ring-2 ring-paper" data-chip-alert title="Over a carrying limit" hidden></span>
                                 </span>
-                                <strong class="mt-0.5 block text-2xl font-black" data-resource="{{ $resource }}">{{ $resources['totals'][$resource] }}</strong>
-                            </div>
+                                <span class="min-w-0 leading-tight">
+                                    <span class="block max-w-[8.5rem] truncate text-sm font-semibold" data-chip-name>{{ $chipHero['name'] ?? 'Character '.$slot }}</span>
+                                    <span class="block max-w-[8.5rem] truncate text-[11px] opacity-70" data-chip-player>{{ $character['player'] ?: 'No player' }}</span>
+                                </span>
+                            </button>
                         @endforeach
+                        <button class="flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-2 text-sm font-semibold text-ink-soft shadow-sm hover:border-orc-600 aria-pressed:border-orc aria-pressed:bg-orc aria-pressed:text-white" type="button" data-character-tab="all" aria-pressed="false" title="Show every character at once">
+                            <x-icon name="users" class="size-4" /> Party
+                        </button>
+                        <button class="flex shrink-0 items-center gap-1.5 rounded-full border border-dashed border-orc-600/60 px-3 py-2 text-sm font-semibold text-orc-700 hover:bg-sage-soft" type="button" data-add-character @if ($activeSlots->count() >= count($state['characters'])) hidden @endif>
+                            <x-icon name="plus" class="size-4" /> Add orc
+                        </button>
                     </div>
                 </div>
 
-                <div class="{{ $panel }}">
-                    <div class="mb-2 flex items-center justify-between gap-2 font-black">
-                        <span>Eligible Upgrades</span>
-                        <small class="font-bold text-slate-500"><span data-upgrades-count>{{ $eligibleUpgrades->count() }}</span> ready</small>
-                    </div>
-                    <div class="max-h-52 overflow-auto" data-upgrades-list>
-                        @forelse ($eligibleUpgrades as $upgrade)
-                            <div class="grid min-h-9 items-center gap-1 border-t border-slate-200 py-1.5 first:border-t-0 md:grid-cols-[1fr_1.3fr_auto] md:gap-2">
-                                <strong>{{ $upgrade['item']['index'] }}</strong>
-                                <span class="text-slate-500">{{ $upgrade['character'] }} &middot; {{ $upgrade['location'] }}</span>
-                                <small class="flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-500">
-                                    @foreach (['wood', 'metal', 'leather', 'gold'] as $resource)
-                                        <span class="inline-flex items-center gap-1">
-                                            <img class="h-4 w-4 object-contain" src="{{ asset($resourceIcons[$resource]) }}" alt="{{ ucfirst($resource) }} resource icon">
-                                            {{ $upgrade['item']['kraft'][$resource] }}
-                                        </span>
-                                    @endforeach
-                                </small>
+                <div class="grid gap-4">
+                    @foreach ($state['characters'] as $slot => $character)
+                        @php
+                            $summary = $summaries[$slot];
+                            $selectedHero = $summary['hero'];
+                            $skillGroups = $selectedHero['skills'] ?? ['10' => [], '20' => [], '30' => []];
+                            $meters = [
+                                'armor' => ['Armor', $summary['armor_weight'], $summary['armor_limit']],
+                                'hands' => ['Hands', $summary['hand_weight'], $summary['hand_limit']],
+                                'inventory' => ['Inventory', $summary['inventory_weight'], $summary['inventory_limit']],
+                            ];
+                        @endphp
+                        <article class="panel overflow-hidden" data-character="{{ $slot }}" @if ((string) $slot !== (string) $firstActiveSlot) hidden @endif>
+                            <input type="hidden" name="characters[{{ $slot }}][active]" value="{{ ($character['active'] ?? false) ? 1 : 0 }}" data-character-active>
+
+                            {{-- Identity strip --}}
+                            <div class="grid gap-3 border-b border-line bg-paper-deep/60 p-3 sm:p-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                                <div class="flex min-w-0 items-start gap-3">
+                                    <img class="size-16 shrink-0 rounded-lg border-2 border-orc object-cover shadow-sm sm:size-[4.5rem]" src="{{ $selectedHero['icon'] ?? '' }}" alt="{{ $selectedHero ? $selectedHero['name'].' portrait' : '' }}" data-hero-icon @if (! $selectedHero) hidden @endif>
+                                    <div class="portrait-fallback size-16 shrink-0 place-items-center rounded-lg border-2 border-dashed border-line-strong text-line-strong sm:size-[4.5rem]"><x-icon name="skull" class="size-8" /></div>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-start justify-between gap-2">
+                                            <div class="min-w-0">
+                                                <p class="eyebrow">Character {{ $slot }}</p>
+                                                <h2 class="font-display truncate text-[1.7rem] leading-tight text-ink" data-hero-name>{{ $selectedHero['name'] ?? 'Unassigned Hero' }}</h2>
+                                            </div>
+                                            <button class="icon-btn -mr-1 -mt-1 size-9 text-muted hover:bg-danger/10 hover:text-danger lg:hidden" type="button" data-remove-character title="Remove this character" aria-label="Remove this character"><x-icon name="trash" class="size-4" /></button>
+                                        </div>
+                                        <div class="mt-1.5 flex flex-wrap gap-1.5" data-hero-facts @if (! $selectedHero) hidden @endif>
+                                            @if ($selectedHero)
+                                                <span class="pill">{{ $selectedHero['class'] }}</span>
+                                                <span class="pill"><span class="size-2.5 rounded-full" style="background: {{ $healthColors[$selectedHero['health_color']] ?? '#776e62' }}"></span>{{ $selectedHero['base_health'] }} {{ $selectedHero['health_color'] }} health</span>
+                                                <span class="pill">Starts with {{ $selectedHero['starting_stuff'] }}</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-3">
+                                    <div class="grid flex-1 grid-cols-3 gap-3 lg:w-80 lg:flex-none">
+                                        @foreach ($meters as $key => [$meterLabel, $used, $limit])
+                                            @php $over = $limit && $used > $limit; @endphp
+                                            <div class="group min-w-0" data-weight="{{ $key }}" data-over="{{ $over ? 'true' : 'false' }}">
+                                                <div class="flex items-baseline justify-between gap-1 text-[11px] font-semibold uppercase tracking-wide text-muted group-data-[over=true]:text-danger">
+                                                    <span class="truncate">{{ $meterLabel }}</span>
+                                                    <span class="text-xs tabular-nums text-ink-soft group-data-[over=true]:text-danger" data-weight-value>{{ $used }}/{{ $limit ?: '–' }}</span>
+                                                </div>
+                                                <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-line">
+                                                    <div class="h-full rounded-full bg-orc-600 transition-[width] group-data-[over=true]:bg-danger" style="width: {{ $limit ? min(100, round($used / $limit * 100)) : 0 }}%" data-weight-bar></div>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                    <button class="icon-btn hidden size-9 text-muted hover:bg-danger/10 hover:text-danger lg:inline-grid" type="button" data-remove-character title="Remove this character" aria-label="Remove this character"><x-icon name="trash" class="size-4" /></button>
+                                </div>
                             </div>
-                        @empty
-                            <p class="text-slate-500">No items can be upgraded with the current pooled resources.</p>
-                        @endforelse
+
+                            <div class="grid gap-3 p-3 sm:p-4">
+                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:max-w-2xl">
+                                    <label>
+                                        <span class="field-label">Player</span>
+                                        <input class="control" name="characters[{{ $slot }}][player]" value="{{ $character['player'] }}" placeholder="Who's playing?" autocomplete="off" data-player-input>
+                                    </label>
+                                    <label>
+                                        <span class="field-label">Hero</span>
+                                        <select class="control" name="characters[{{ $slot }}][hero_id]" data-filter="hero" data-hero-select>
+                                            <option value="">Choose hero</option>
+                                            @foreach ($heroes as $hero)
+                                                <option value="{{ $hero['id'] }}" @selected($character['hero_id'] === $hero['id'])>{{ $hero['name'] }} · {{ $hero['class'] }}</option>
+                                            @endforeach
+                                        </select>
+                                    </label>
+                                </div>
+
+                                <div class="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+                                    <div class="grid gap-3">
+                                        {{-- Equipment --}}
+                                        <details class="tray rounded-lg border border-line bg-white/50" data-character-tray="equipment" open>
+                                            <summary>
+                                                <span class="section-title">Equipment</span>
+                                                <span class="min-w-0 flex-1 truncate text-right text-xs text-muted" data-tray-summary="equipment"></span>
+                                                <x-icon name="chevron" class="chev size-4 text-muted" />
+                                            </summary>
+                                            <div class="@container/equipment grid gap-2 border-t border-line p-2 sm:p-3">
+                                                @foreach ($equipmentSlots as $equip)
+                                                    <div class="rounded-md border border-line bg-paper p-2" data-slot>
+                                                        <div class="mb-1.5 flex items-center gap-1">
+                                                            <span class="-ml-0.5 rounded p-0.5 text-line-strong hover:bg-paper-deep hover:text-muted" data-drag-handle title="Drag to move this item"><x-icon name="grip" class="size-4" /></span>
+                                                            <span class="text-sm font-semibold text-ink-soft">{{ $equip['label'] }}</span>
+                                                        </div>
+                                                        <div class="equip-fields">
+                                                            <label class="eq-left">
+                                                                <span class="field-label">Left enchant</span>
+                                                                <select class="control" name="characters[{{ $slot }}][equipment][{{ $equip['left'] }}]" data-filter="enchant" data-enchant-side="left" data-needs-hero @disabled(! $selectedHero)>
+                                                                    <option value="">None</option>
+                                                                    @foreach ($leftEnchants as $option)
+                                                                        <option value="{{ $option['value'] }}" @selected(($character['equipment'][$equip['left']] ?? '') === $option['value'])>{{ $option['label'] }}</option>
+                                                                    @endforeach
+                                                                </select>
+                                                            </label>
+                                                            <label class="eq-item">
+                                                                <span class="field-label">Item</span>
+                                                                <select class="control font-medium" name="characters[{{ $slot }}][equipment][{{ $equip['item'] }}]" data-filter="item" data-location="{{ $equip['label'] }}" data-needs-hero @disabled(! $selectedHero)>
+                                                                    <option value="">None</option>
+                                                                    @foreach ($items as $item)
+                                                                        <option value="{{ $item['index'] }}" @selected(($character['equipment'][$equip['item']] ?? '') === $item['index'])>{{ $item['label'] }}</option>
+                                                                    @endforeach
+                                                                </select>
+                                                            </label>
+                                                            <label class="eq-right">
+                                                                <span class="field-label">Right enchant</span>
+                                                                <select class="control" name="characters[{{ $slot }}][equipment][{{ $equip['right'] }}]" data-filter="enchant" data-enchant-side="right" data-needs-hero @disabled(! $selectedHero)>
+                                                                    <option value="">None</option>
+                                                                    @foreach ($rightEnchants as $option)
+                                                                        <option value="{{ $option['value'] }}" @selected(($character['equipment'][$equip['right']] ?? '') === $option['value'])>{{ $option['label'] }}</option>
+                                                                    @endforeach
+                                                                </select>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </details>
+
+                                        {{-- Skills --}}
+                                        <details class="tray rounded-lg border border-line bg-white/50" data-character-tray="skills" open>
+                                            <summary>
+                                                <span class="section-title">Skill Cards</span>
+                                                <span class="min-w-0 flex-1 truncate text-right text-xs text-muted" data-tray-summary="skills"></span>
+                                                <x-icon name="chevron" class="chev size-4 text-muted" />
+                                            </summary>
+                                            <div class="@container/skills border-t border-line p-2 sm:p-3">
+                                                <div class="grid gap-3 @xl/skills:grid-cols-3">
+                                                    @foreach (['10' => 8, '20' => 4, '30' => 1] as $tier => $slots)
+                                                        <div class="min-w-0">
+                                                            <div class="mb-1.5 flex items-baseline justify-between">
+                                                                <span class="font-display text-base text-orc-700">{{ $tier }} Badass Points</span>
+                                                                <span class="text-xs font-semibold tabular-nums text-muted"><span data-skill-count="{{ $tier }}">0</span>/{{ $slots }}</span>
+                                                            </div>
+                                                            <div class="grid gap-1.5">
+                                                                @for ($i = 0; $i < $slots; $i++)
+                                                                    <label class="block" data-skill-slot>
+                                                                        <span class="sr-only">{{ $tier }} point skill {{ $i + 1 }}</span>
+                                                                        <select class="control" name="characters[{{ $slot }}][skills][{{ $tier }}][]" data-skill-tier="{{ $tier }}" data-needs-hero @disabled(! $selectedHero)>
+                                                                            <option value="">Add a skill…</option>
+                                                                            @foreach ($skillGroups[$tier] ?? [] as $skill)
+                                                                                <option value="{{ $skill }}" @selected(($character['skills'][$tier][$i] ?? '') === $skill)>{{ $skill }}</option>
+                                                                            @endforeach
+                                                                        </select>
+                                                                    </label>
+                                                                @endfor
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </details>
+                                    </div>
+
+                                    {{-- Inventory --}}
+                                    <details class="tray rounded-lg border border-line bg-white/50" data-character-tray="inventory" open>
+                                        <summary>
+                                            <span class="section-title">Inventory</span>
+                                            <span class="min-w-0 flex-1 truncate text-right text-xs text-muted" data-tray-summary="inventory"></span>
+                                            <x-icon name="chevron" class="chev size-4 text-muted" />
+                                        </summary>
+                                        <div class="@container/inventory border-t border-line p-2 sm:p-3">
+                                            <div class="inv-head mb-1 gap-1.5 px-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted" aria-hidden="true">
+                                                <span class="text-center">#</span><span>Left enchant</span><span>Item</span><span>Right enchant</span><span class="text-center">Rekup</span>
+                                            </div>
+                                            <div class="grid gap-1.5">
+                                                @foreach ($character['inventory'] as $index => $row)
+                                                    @php $inventoryItem = $items->firstWhere('index', $row['item']); @endphp
+                                                    <div class="inv-row rounded-md border border-transparent p-0.5 odd:bg-paper-deep/50" data-inventory-row data-slot data-empty="{{ $row['item'] === '' ? 'true' : 'false' }}">
+                                                        <div class="inv-num flex flex-col items-center justify-center rounded text-muted hover:bg-paper-deep" data-drag-handle title="Drag to move this item">
+                                                            <span class="text-[11px] font-semibold tabular-nums">{{ $index + 1 }}</span>
+                                                            <x-icon name="grip" class="size-3.5 text-line-strong" />
+                                                        </div>
+                                                        <label class="inv-left">
+                                                            <span class="sr-only">Left enchant</span>
+                                                            <select class="control" name="characters[{{ $slot }}][inventory][{{ $index }}][left_enchant]" data-filter="enchant" data-enchant-side="left" data-needs-hero @disabled(! $selectedHero || $row['item'] === '')>
+                                                                <option value="">Left enchant</option>
+                                                                @foreach ($leftEnchants as $option)
+                                                                    <option value="{{ $option['value'] }}" @selected(($row['left_enchant'] ?? '') === $option['value'])>{{ $option['label'] }}</option>
+                                                                @endforeach
+                                                            </select>
+                                                        </label>
+                                                        <label class="inv-item">
+                                                            <span class="sr-only">Item</span>
+                                                            <select class="control font-medium" name="characters[{{ $slot }}][inventory][{{ $index }}][item]" data-filter="item" data-location="Inventory {{ $index + 1 }}" data-needs-hero @disabled(! $selectedHero)>
+                                                                <option value="">Empty</option>
+                                                                @foreach ($items as $item)
+                                                                    <option value="{{ $item['index'] }}" @selected($row['item'] === $item['index'])>{{ $item['label'] }}</option>
+                                                                @endforeach
+                                                            </select>
+                                                        </label>
+                                                        <label class="inv-right">
+                                                            <span class="sr-only">Right enchant</span>
+                                                            <select class="control" name="characters[{{ $slot }}][inventory][{{ $index }}][right_enchant]" data-filter="enchant" data-enchant-side="right" data-needs-hero @disabled(! $selectedHero || $row['item'] === '')>
+                                                                <option value="">Right enchant</option>
+                                                                @foreach ($rightEnchants as $option)
+                                                                    <option value="{{ $option['value'] }}" @selected(($row['right_enchant'] ?? '') === $option['value'])>{{ $option['label'] }}</option>
+                                                                @endforeach
+                                                            </select>
+                                                        </label>
+                                                        <label class="inv-rekup h-10 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-line bg-white px-2 text-xs font-semibold text-muted has-checked:border-ember has-checked:bg-ember/10 has-checked:text-[#8a4210] sm:h-9" title="Break this card down into resources">
+                                                            <input class="size-4" type="checkbox" name="characters[{{ $slot }}][inventory][{{ $index }}][rekup]" value="1" @checked($row['rekup'] || ($inventoryItem['always_rekup'] ?? false)) data-rekup data-needs-hero @disabled(! $selectedHero || ($inventoryItem['always_rekup'] ?? false))>
+                                                            <span>Rekup</span>
+                                                        </label>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </details>
+                                </div>
+                            </div>
+                        </article>
+                    @endforeach
+
+                    <div class="panel grid place-items-center gap-3 p-10 text-center" data-no-characters @if ($activeSlots->isNotEmpty()) hidden @endif>
+                        <x-icon name="skull" class="size-10 text-line-strong" />
+                        <p class="font-display text-2xl text-stone">No orcs in this warband yet</p>
+                        <button class="btn btn-primary" type="button" data-add-character><x-icon name="plus" class="size-4" /> Add an orc</button>
+                    </div>
+                </div>
+            </section>
+
+            {{-- Kraft & Rekup ------------------------------------------------------------------------- --}}
+            <section class="grid items-start gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]" data-tab-panel="resources" hidden>
+                <h2 class="page-title lg:col-span-2">Kraft &amp; Rekup</h2>
+
+                <div class="grid gap-4">
+                    <div class="chamfer">
+                        <div class="chamfer-inner p-3 sm:p-4">
+                            <div class="mb-2 flex items-baseline justify-between gap-2">
+                                <h3 class="section-title">Rekup Pool</h3>
+                                <span class="text-xs text-ink-soft/80">From inventory cards marked rekup</span>
+                            </div>
+                            <div class="grid grid-cols-4 gap-2">
+                                @foreach ($resourceNames as $resource)
+                                    <div class="flex flex-col items-center rounded-md bg-white/70 px-1 py-2 shadow-sm">
+                                        <img class="size-8 object-contain" src="{{ $resourceIcons[$resource] }}" alt="">
+                                        <strong class="text-3xl font-bold leading-tight tabular-nums text-ink" data-resource="{{ $resource }}">{{ $resources['totals'][$resource] }}</strong>
+                                        <span class="text-[11px] font-semibold uppercase tracking-wide text-ink-soft/80">{{ ucfirst($resource) }}</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel p-3 sm:p-4">
+                        <div class="mb-1 flex items-baseline justify-between gap-2">
+                            <h3 class="section-title">Ready to Kraft</h3>
+                            <span class="text-xs text-muted"><span class="font-semibold text-ink" data-upgrades-count>{{ $eligibleUpgrades->count() }}</span> affordable now</span>
+                        </div>
+                        <div class="max-h-[22rem] overflow-auto" data-upgrades-list></div>
                     </div>
                 </div>
 
-                <div class="{{ $panel }} xl:col-span-2">
-                    <div class="mb-2 flex items-center justify-between gap-2 font-black">
-                        <span>Kraft Planner</span>
-                        <small class="font-bold text-slate-500">Find whole-card rekup payments with less waste</small>
+                <div class="panel @container/kraft p-3 sm:p-4">
+                    <div class="mb-3 flex items-baseline justify-between gap-2">
+                        <h3 class="section-title">Kraft Planner</h3>
+                        <span class="text-right text-xs text-muted">Pick whole rekup cards with the least waste</span>
                     </div>
-                    <div class="grid gap-3 lg:grid-cols-[1fr_0.55fr]">
+                    <div class="grid gap-2 @lg/kraft:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
                         <label>
-                            <span class="{{ $label }} flex min-h-5 items-center">Upgrade Target</span>
-                            <select class="{{ $control }}" data-kraft-target>
+                            <span class="field-label">Upgrade target</span>
+                            <select class="control" data-kraft-target>
                                 <option value="">Choose an owned upgradeable item</option>
                             </select>
                         </label>
-                        <label>
-                            <span class="{{ $label }} flex min-h-5 items-center gap-1">
-                                Strategy
-                                <button class="grid h-5 w-5 place-items-center rounded-full border border-slate-300 bg-slate-50 text-xs font-black text-slate-600 hover:border-emerald-700 hover:text-emerald-800" type="button" data-modal-open="strategy-help" aria-label="Show strategy help">?</button>
-                            </span>
-                            <select class="{{ $control }}" data-kraft-strategy>
-                                <option value="least_waste">Least amount of wasted resources</option>
-                                <option value="retain_wood">Retain the most wood</option>
-                                <option value="retain_gold">Retain the most gold</option>
-                                <option value="retain_metal">Retain the most metal</option>
-                                <option value="retain_leather">Retain the most leather</option>
+                        <div>
+                            <div class="field-label flex items-center gap-1">
+                                <label for="kraft-strategy">Strategy</label>
+                                <button class="text-muted hover:text-orc-600" type="button" data-modal-open="strategy-help" aria-label="Explain strategies"><x-icon name="help" class="size-3.5" /></button>
+                            </div>
+                            <select class="control" id="kraft-strategy" data-kraft-strategy>
+                                <option value="least_waste">Least wasted resources</option>
+                                <option value="retain_wood">Keep the most wood</option>
+                                <option value="retain_gold">Keep the most gold</option>
+                                <option value="retain_metal">Keep the most metal</option>
+                                <option value="retain_leather">Keep the most leather</option>
                             </select>
-                        </label>
-                    </div>
-                    <div class="mt-3 grid gap-2 lg:grid-cols-[0.8fr_1.2fr]">
-                        <div class="rounded-md border border-slate-200 bg-slate-50 p-2.5" data-kraft-summary>
-                            <p class="text-sm font-bold text-slate-500">Choose a target to plan a kraft.</p>
-                        </div>
-                        <div class="rounded-md border border-slate-200 bg-slate-50 p-2.5" data-kraft-suggestion>
-                            <p class="text-sm font-bold text-slate-500">Exact payment cards will appear here.</p>
                         </div>
                     </div>
-                    <div class="mt-3">
-                        <div class="mb-1.5 flex items-center justify-between gap-2 font-black">
-                            <span>Almost Craftable</span>
-                            <small class="font-bold text-slate-500">Owned upgrades that need more rekup</small>
+                    <div class="mt-3 grid gap-3 @2xl/kraft:grid-cols-2">
+                        <div class="rounded-md border border-line bg-white/60 p-3" data-kraft-summary></div>
+                        <div class="rounded-md border border-line bg-white/60 p-3" data-kraft-suggestion></div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="mb-2 flex items-baseline justify-between gap-2">
+                            <h4 class="font-display text-base text-orc-700">Almost Kraftable</h4>
+                            <span class="text-xs text-muted">Owned upgrades that need more rekup</span>
                         </div>
-                        <div class="grid gap-2 md:grid-cols-2 xl:grid-cols-3" data-almost-craftable>
-                            <p class="text-sm font-bold text-slate-500">Almost-craftable items will appear here.</p>
-                        </div>
+                        <div class="grid gap-2 @md/kraft:grid-cols-2 @3xl/kraft:grid-cols-3" data-almost-craftable></div>
                     </div>
                 </div>
             </section>
 
-            <section class="grid gap-3" data-tab-panel="characters">
-                @foreach ($state['characters'] as $slot => $character)
-                    @php
-                        $summary = $summaries[$slot];
-                        $selectedHero = $summary['hero'];
-                        $skillGroups = $selectedHero['skills'] ?? ['10' => [], '20' => [], '30' => []];
-                    @endphp
-                    <article class="{{ $panel }}" data-character="{{ $slot }}">
-                        <div class="mb-2 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                            <div class="flex items-center gap-2.5">
-                                <img
-                                    class="h-12 w-12 rounded-md border border-slate-200 bg-slate-100 object-cover shadow-sm sm:h-14 sm:w-14"
-                                    src="{{ $selectedHero['icon'] ?? '' }}"
-                                    alt="{{ $selectedHero ? $selectedHero['name'].' icon' : 'No hero selected' }}"
-                                    data-hero-icon
-                                    @if (! $selectedHero) hidden @endif
-                                >
-                                <div>
-                                    <p class="text-xs font-extrabold uppercase text-emerald-700">Character {{ $slot }}</p>
-                                    <h2 class="text-xl font-black leading-tight sm:text-2xl" data-hero-name>{{ $selectedHero['name'] ?? 'Unassigned Hero' }}</h2>
-                                </div>
-                            </div>
-                            <div class="flex flex-wrap gap-1 md:justify-end">
-                                <span @class([
-                                    'rounded-full px-2 py-1 text-xs font-black',
-                                    'bg-red-50 text-red-700' => $summary['inventory_limit'] && $summary['inventory_weight'] > $summary['inventory_limit'],
-                                    'bg-emerald-50 text-emerald-950' => ! ($summary['inventory_limit'] && $summary['inventory_weight'] > $summary['inventory_limit']),
-                                ]) data-weight="inventory">
-                                    Inv {{ $summary['inventory_weight'] }}/{{ $summary['inventory_limit'] ?: '-' }}
-                                </span>
-                                <span @class([
-                                    'rounded-full px-2 py-1 text-xs font-black',
-                                    'bg-red-50 text-red-700' => $summary['hand_limit'] && $summary['hand_weight'] > $summary['hand_limit'],
-                                    'bg-emerald-50 text-emerald-950' => ! ($summary['hand_limit'] && $summary['hand_weight'] > $summary['hand_limit']),
-                                ]) data-weight="hands">
-                                    Hands {{ $summary['hand_weight'] }}/{{ $summary['hand_limit'] ?: '-' }}
-                                </span>
-                                <span @class([
-                                    'rounded-full px-2 py-1 text-xs font-black',
-                                    'bg-red-50 text-red-700' => $summary['armor_limit'] && $summary['armor_weight'] > $summary['armor_limit'],
-                                    'bg-emerald-50 text-emerald-950' => ! ($summary['armor_limit'] && $summary['armor_weight'] > $summary['armor_limit']),
-                                ]) data-weight="armor">
-                                    Armor {{ $summary['armor_weight'] }}/{{ $summary['armor_limit'] ?: '-' }}
-                                </span>
-                            </div>
-                        </div>
+            {{-- Campaign ------------------------------------------------------------------------------ --}}
+            <section class="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]" data-tab-panel="campaign" hidden>
+                <h2 class="page-title lg:col-span-2">Campaign</h2>
 
-                        <div class="grid gap-2 md:grid-cols-[0.8fr_1.2fr]">
-                            <label>
-                                <span class="{{ $label }}">Player</span>
-                                <input class="{{ $control }}" name="characters[{{ $slot }}][player]" value="{{ $character['player'] }}">
-                            </label>
-                            <label>
-                                <span class="{{ $label }}">Hero</span>
-                                <select class="{{ $control }}" name="characters[{{ $slot }}][hero_id]" data-filter="hero" data-hero-select>
-                                    <option value="">Choose hero</option>
-                                    @foreach ($heroes as $hero)
-                                        <option value="{{ $hero['id'] }}" @selected($character['hero_id'] === $hero['id'])>
-                                            {{ $hero['name'] }} &middot; {{ $hero['class'] }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </label>
-                        </div>
-
-                        @if ($selectedHero)
-                            <div class="mt-2 flex flex-wrap gap-1.5" data-hero-facts>
-                                <span class="rounded-md bg-amber-50 px-2 py-1 text-xs font-extrabold text-amber-900">Class: {{ $selectedHero['class'] }}</span>
-                                <span class="rounded-md bg-amber-50 px-2 py-1 text-xs font-extrabold text-amber-900">Base Health: {{ $selectedHero['base_health'] }} {{ $selectedHero['health_color'] }} health</span>
-                                <span class="rounded-md bg-amber-50 px-2 py-1 text-xs font-extrabold text-amber-900">Starting item(s):{{ $selectedHero['starting_stuff'] }}</span>
-                            </div>
-                        @endif
-
-                        <details class="{{ $tray }} border-emerald-200" data-character-tray="skills">
-                            <summary class="{{ $traySummary }} bg-emerald-50 text-emerald-950">
-                                <span class="{{ $trayTitle }}">Skill Cards Purchased</span>
-                                <span class="{{ $trayMeta }}" data-tray-summary="skills">No skills purchased</span>
-                            </summary>
-                            <div class="{{ $trayBody }} border-emerald-100 bg-emerald-50/35">
-                                <div class="grid gap-2 lg:grid-cols-[1fr_1fr_0.65fr]">
-                                    @foreach (['10' => 8, '20' => 4, '30' => 1] as $tier => $slots)
-                                        <div class="rounded-md border border-emerald-100 bg-white p-2">
-                                            <span class="{{ $label }}">{{ $tier }} Badass Points</span>
-                                            @for ($i = 0; $i < $slots; $i++)
-                                            <select class="{{ $control }} mb-1" name="characters[{{ $slot }}][skills][{{ $tier }}][]" data-skill-tier="{{ $tier }}" data-needs-hero @disabled(! $selectedHero)>
-                                                    <option value="">Empty</option>
-                                                    @foreach ($skillGroups[$tier] ?? [] as $skill)
-                                                        <option value="{{ $skill }}" @selected(($character['skills'][$tier][$i] ?? '') === $skill)>{{ $skill }}</option>
-                                                    @endforeach
-                                                </select>
-                                            @endfor
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
-                        </details>
-
-                        <details class="{{ $tray }} border-sky-200" data-character-tray="equipment">
-                            <summary class="{{ $traySummary }} bg-sky-50 text-sky-950">
-                                <span class="{{ $trayTitle }}">Weapons, Armor, Enchants</span>
-                                <span class="{{ $trayMeta }}" data-tray-summary="equipment">No equipment selected</span>
-                            </summary>
-                            <div class="{{ $trayBody }} border-sky-100 bg-sky-50/35">
-                                <div class="grid gap-2 md:grid-cols-2 2xl:grid-cols-4">
-                                    @foreach ([
-                                        'hand_item_1' => 'Hand item 1',
-                                        'hand_item_2' => 'Hand item 2',
-                                    ] as $handKey => $labelText)
-                                        <div class="rounded-md border border-sky-100 bg-white p-2.5 2xl:col-span-2">
-                                            <div class="mb-1.5 text-sm font-black text-sky-950">{{ $labelText }}</div>
-                                            <div class="grid gap-1.5 md:grid-cols-3">
-                                                <label>
-                                                    <span class="{{ $label }}">Left enchant</span>
-                                                    <select class="{{ $control }}" name="characters[{{ $slot }}][equipment][{{ $handKey }}_left_enchant]" data-filter="enchant" data-enchant-side="left" data-needs-hero @disabled(! $selectedHero)>
-                                                        <option value="">None</option>
-                                                        @foreach ($leftEnchants as $option)
-                                                            <option value="{{ $option['value'] }}" @selected(($character['equipment'][$handKey.'_left_enchant'] ?? '') === $option['value'])>{{ $option['label'] }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                </label>
-                                                <label>
-                                                    <span class="{{ $label }}">Item</span>
-                                                    <select class="{{ $control }}" name="characters[{{ $slot }}][equipment][{{ $handKey }}]" data-filter="item" data-needs-hero @disabled(! $selectedHero)>
-                                                        <option value="">None</option>
-                                                        @foreach ($items as $item)
-                                                            <option value="{{ $item['index'] }}" @selected($character['equipment'][$handKey] === $item['index'])>{{ $item['index'] }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                </label>
-                                                <label>
-                                                    <span class="{{ $label }}">Right enchant</span>
-                                                    <select class="{{ $control }}" name="characters[{{ $slot }}][equipment][{{ $handKey }}_right_enchant]" data-filter="enchant" data-enchant-side="right" data-needs-hero @disabled(! $selectedHero)>
-                                                        <option value="">None</option>
-                                                        @foreach ($rightEnchants as $option)
-                                                            <option value="{{ $option['value'] }}" @selected(($character['equipment'][$handKey.'_right_enchant'] ?? '') === $option['value'])>{{ $option['label'] }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                    <div class="rounded-md border border-sky-100 bg-white p-2.5 2xl:col-span-2">
-                                        <div class="mb-1.5 text-sm font-black text-sky-950">Armor</div>
-                                        <div class="grid gap-1.5 md:grid-cols-3">
-                                            <label>
-                                                <span class="{{ $label }}">Left enchant</span>
-                                                <select class="{{ $control }}" name="characters[{{ $slot }}][equipment][armor_left_enchant]" data-filter="enchant" data-enchant-side="left" data-needs-hero @disabled(! $selectedHero)>
-                                                    <option value="">None</option>
-                                                    @foreach ($leftEnchants as $option)
-                                                        <option value="{{ $option['value'] }}" @selected($character['equipment']['armor_left_enchant'] === $option['value'])>{{ $option['label'] }}</option>
-                                                    @endforeach
-                                                </select>
-                                            </label>
-                                            <label>
-                                                <span class="{{ $label }}">Item</span>
-                                                <select class="{{ $control }}" name="characters[{{ $slot }}][equipment][armor_item]" data-filter="item" data-needs-hero @disabled(! $selectedHero)>
-                                                    <option value="">None</option>
-                                                    @foreach ($items as $item)
-                                                        <option value="{{ $item['index'] }}" @selected($character['equipment']['armor_item'] === $item['index'])>{{ $item['index'] }}</option>
-                                                    @endforeach
-                                                </select>
-                                            </label>
-                                            <label>
-                                                <span class="{{ $label }}">Right enchant</span>
-                                                <select class="{{ $control }}" name="characters[{{ $slot }}][equipment][armor_right_enchant]" data-filter="enchant" data-enchant-side="right" data-needs-hero @disabled(! $selectedHero)>
-                                                    <option value="">None</option>
-                                                    @foreach ($rightEnchants as $option)
-                                                        <option value="{{ $option['value'] }}" @selected($character['equipment']['armor_right_enchant'] === $option['value'])>{{ $option['label'] }}</option>
-                                                    @endforeach
-                                                </select>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="rounded-md border border-sky-100 bg-white p-2.5 2xl:col-span-2">
-                                        <div class="mb-1.5 text-sm font-black text-sky-950">Artifact</div>
-                                        <div class="grid gap-1.5 md:grid-cols-3">
-                                            <label>
-                                                <span class="{{ $label }}">Left enchant</span>
-                                                <select class="{{ $control }}" name="characters[{{ $slot }}][equipment][artifact_left_enchant]" data-filter="enchant" data-enchant-side="left" data-needs-hero @disabled(! $selectedHero)>
-                                                    <option value="">None</option>
-                                                    @foreach ($leftEnchants as $option)
-                                                        <option value="{{ $option['value'] }}" @selected(($character['equipment']['artifact_left_enchant'] ?? '') === $option['value'])>{{ $option['label'] }}</option>
-                                                    @endforeach
-                                                </select>
-                                            </label>
-                                            <label>
-                                                <span class="{{ $label }}">Item</span>
-                                                <select class="{{ $control }}" name="characters[{{ $slot }}][equipment][artifact_item]" data-filter="item" data-needs-hero @disabled(! $selectedHero)>
-                                                    <option value="">None</option>
-                                                    @foreach ($items as $item)
-                                                        <option value="{{ $item['index'] }}" @selected($character['equipment']['artifact_item'] === $item['index'])>{{ $item['index'] }}</option>
-                                                    @endforeach
-                                                </select>
-                                            </label>
-                                            <label>
-                                                <span class="{{ $label }}">Right enchant</span>
-                                                <select class="{{ $control }}" name="characters[{{ $slot }}][equipment][artifact_right_enchant]" data-filter="enchant" data-enchant-side="right" data-needs-hero @disabled(! $selectedHero)>
-                                                    <option value="">None</option>
-                                                    @foreach ($rightEnchants as $option)
-                                                        <option value="{{ $option['value'] }}" @selected(($character['equipment']['artifact_right_enchant'] ?? '') === $option['value'])>{{ $option['label'] }}</option>
-                                                    @endforeach
-                                                </select>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </details>
-
-                        <details class="{{ $tray }} border-amber-200" data-character-tray="inventory">
-                            <summary class="{{ $traySummary }} bg-amber-50 text-amber-950">
-                                <span class="{{ $trayTitle }}">Inventory Items</span>
-                                <span class="{{ $trayMeta }}" data-tray-summary="inventory">No inventory items</span>
-                            </summary>
-                            <div class="{{ $trayBody }} border-amber-100 bg-amber-50/35">
-                                <div class="grid gap-2 xl:grid-cols-2">
-                                    @foreach ($character['inventory'] as $index => $row)
-                                        @php $inventoryItem = $items->firstWhere('index', $row['item']); @endphp
-                                        <div class="rounded-md border border-amber-100 bg-white p-2" data-inventory-row>
-                                            <div class="grid gap-1.5 md:grid-cols-[0.75fr_1fr_0.75fr_auto]">
-                                                <label>
-                                                    <span class="{{ $label }}">Left enchant</span>
-                                                    <select class="{{ $control }}" name="characters[{{ $slot }}][inventory][{{ $index }}][left_enchant]" data-filter="enchant" data-enchant-side="left" data-needs-hero @disabled(! $selectedHero || $row['item'] === '')>
-                                                        <option value="">None</option>
-                                                        @foreach ($leftEnchants as $option)
-                                                            <option value="{{ $option['value'] }}" @selected(($row['left_enchant'] ?? '') === $option['value'])>{{ $option['label'] }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                </label>
-                                                <label>
-                                                    <span class="{{ $label }}">Item</span>
-                                                    <select class="{{ $control }}" name="characters[{{ $slot }}][inventory][{{ $index }}][item]" data-filter="item" data-needs-hero @disabled(! $selectedHero)>
-                                                        <option value="">Empty</option>
-                                                        @foreach ($items as $item)
-                                                            <option value="{{ $item['index'] }}" @selected($row['item'] === $item['index'])>{{ $item['index'] }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                </label>
-                                                <label>
-                                                    <span class="{{ $label }}">Right enchant</span>
-                                                    <select class="{{ $control }}" name="characters[{{ $slot }}][inventory][{{ $index }}][right_enchant]" data-filter="enchant" data-enchant-side="right" data-needs-hero @disabled(! $selectedHero || $row['item'] === '')>
-                                                        <option value="">None</option>
-                                                        @foreach ($rightEnchants as $option)
-                                                            <option value="{{ $option['value'] }}" @selected(($row['right_enchant'] ?? '') === $option['value'])>{{ $option['label'] }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                </label>
-                                                <label class="grid min-w-20 grid-cols-[18px_auto] items-end gap-1 pb-1.5 text-xs font-extrabold text-slate-500">
-                                                    <input class="h-4 w-4 accent-emerald-800 disabled:cursor-not-allowed disabled:opacity-40" type="checkbox" name="characters[{{ $slot }}][inventory][{{ $index }}][rekup]" value="1" @checked($row['rekup'] || ($inventoryItem['always_rekup'] ?? false)) data-rekup data-needs-hero @disabled(! $selectedHero || ($inventoryItem['always_rekup'] ?? false))>
-                                                    <span>Rekup</span>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
-                        </details>
-                    </article>
-                @endforeach
-            </section>
-
-            <section class="mt-3 grid gap-3 xl:grid-cols-[1.4fr_0.6fr]" data-tab-panel="campaign" hidden>
-                <div class="{{ $panel }} min-w-0">
-                    <div class="mb-2 flex items-center justify-between gap-2 font-black">
-                        <span>Campaign</span>
-                        <small class="font-bold text-slate-500"><span data-campaign-count>{{ collect($state['campaign'])->filter()->count() }}</span> completed</small>
+                <div class="panel min-w-0 p-3 sm:p-4">
+                    <div class="mb-3 grid items-end gap-3 sm:grid-cols-[minmax(0,26rem)_1fr]">
+                        <label>
+                            <span class="field-label">Campaign name</span>
+                            <input class="control" name="campaign_name" value="{{ $activeCampaignName }}">
+                        </label>
+                        <p class="text-sm text-muted sm:text-right"><span class="text-2xl font-bold tabular-nums text-orc-700" data-campaign-count>{{ collect($state['campaign'])->filter()->count() }}</span> quests completed</p>
                     </div>
-                    <label class="mb-3 block">
-                        <span class="{{ $label }}">Campaign Name</span>
-                        <input class="{{ $control }}" name="campaign_name" value="{{ $activeCampaignName }}">
-                    </label>
-                    <div class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                    <div class="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
                         @foreach ($campaignQuests as $group => $quests)
-                            <div>
-                                <h3 class="mb-1.5 text-sm font-black">{{ $group }}</h3>
-                                @foreach ($quests as $quest)
-                                    @php $key = md5($group.'|'.$quest['quest']); @endphp
-                                    <label class="flex min-h-6 items-center gap-2 text-sm">
-                                        <input class="h-4 w-4 accent-emerald-800" type="checkbox" name="campaign[{{ $key }}]" value="1" @checked($state['campaign'][$key] ?? false)>
-                                        <span>{{ $quest['quest'] }}</span>
-                                    </label>
-                                @endforeach
+                            <div class="rounded-lg border border-line bg-white/60" data-campaign-group>
+                                <div class="flex items-baseline justify-between gap-2 border-b border-line px-3 py-2">
+                                    <h3 class="section-title text-base">{{ $group }}</h3>
+                                    <span class="shrink-0 text-xs font-semibold tabular-nums text-muted"><span data-campaign-group-count>0</span>/{{ count($quests) }}</span>
+                                </div>
+                                <div class="grid p-1">
+                                    @foreach ($quests as $quest)
+                                        @php $key = md5($group.'|'.$quest['quest']); @endphp
+                                        <label class="flex min-h-10 cursor-pointer items-center gap-2.5 rounded px-2 text-sm hover:bg-paper-deep has-checked:text-muted sm:min-h-9">
+                                            <input class="size-[1.05rem] shrink-0" type="checkbox" name="campaign[{{ $key }}]" value="1" @checked($state['campaign'][$key] ?? false)>
+                                            <span>{{ $quest['quest'] }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
                             </div>
                         @endforeach
                     </div>
                 </div>
 
-                <div class="{{ $panel }}">
-                    <div class="mb-2 flex items-center justify-between gap-2 font-black">
-                        <span>Notes</span>
-                        <small class="font-bold text-slate-500">Freeform campaign memory</small>
+                <div class="panel p-3 sm:p-4 lg:sticky lg:top-20">
+                    <div class="mb-2 flex items-baseline justify-between gap-2">
+                        <h3 class="section-title">Notes</h3>
+                        <span class="text-xs text-muted">Campaign memory</span>
                     </div>
-                    <textarea class="{{ $control }} min-h-[260px] resize-y md:min-h-[320px]" name="notes" rows="14">{{ $state['notes'] }}</textarea>
+                    <textarea class="control min-h-64 resize-y lg:min-h-[28rem]" name="notes" rows="14" placeholder="Grudges, loot owed, who smashed which door…">{{ $state['notes'] }}</textarea>
                 </div>
             </section>
-
-            <div class="mt-4 flex flex-col gap-2 md:flex-row md:justify-end">
-                <button class="min-h-10 rounded-md border border-emerald-800 px-4 text-sm font-extrabold text-emerald-950 hover:bg-emerald-50" type="submit" name="intent" value="save_as">Save As New Campaign</button>
-            </div>
         </form>
-    </main>
-    <div class="fixed inset-0 z-50 hidden bg-slate-950/70 p-4" data-modal="strategy-help" role="dialog" aria-modal="true" aria-labelledby="strategy-help-title">
-        <div class="mx-auto mt-12 w-[min(620px,100%)] rounded-lg border border-slate-200 bg-white p-4 shadow-2xl md:mt-20 md:p-5" data-modal-card>
-            <div class="mb-3 flex items-center justify-between gap-2">
-                <h2 class="text-xl font-black" id="strategy-help-title">Kraft Strategy Help</h2>
-                <button class="grid h-9 w-9 place-items-center rounded-md border border-slate-300 text-lg font-black text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700" type="button" data-modal-close aria-label="Close strategy help">x</button>
+
+        {{-- History (outside the form: its filters are not tracker state) ------------------------ --}}
+        <section class="grid gap-4" data-tab-panel="history" hidden>
+            <h2 class="page-title">History</h2>
+            <div class="panel p-3 sm:p-4">
+                <div class="mb-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem_12rem]">
+                    <label>
+                        <span class="sr-only">Search history</span>
+                        <input class="control" type="search" placeholder="Search history…" data-history-search>
+                    </label>
+                    <label>
+                        <span class="sr-only">Filter by type</span>
+                        <select class="control" data-history-type>
+                            <option value="">Everything</option>
+                            <option value="character">Characters</option>
+                            <option value="item">Items &amp; moves</option>
+                            <option value="rekup">Rekup</option>
+                            <option value="enchant">Enchants</option>
+                            <option value="skill">Skills</option>
+                            <option value="kraft">Kraft &amp; upgrades</option>
+                            <option value="quest">Quests</option>
+                            <option value="campaign">Campaign &amp; notes</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span class="sr-only">Filter by character</span>
+                        <select class="control" data-history-character>
+                            <option value="">Whole warband</option>
+                        </select>
+                    </label>
+                </div>
+                <div data-history-list></div>
             </div>
-            <div class="grid gap-3 text-sm font-bold text-slate-600">
-                <p><strong class="text-slate-950">Least amount of wasted resources:</strong> finds the closest payment to the kraft cost, then uses fewer cards when multiple payments waste the same amount.</p>
-                <p><strong class="text-slate-950">Retain the most wood:</strong> avoids consuming cards that generate wood when possible.</p>
-                <p><strong class="text-slate-950">Retain the most metal:</strong> avoids consuming cards that generate metal when possible.</p>
-                <p><strong class="text-slate-950">Retain the most leather:</strong> avoids consuming cards that generate leather when possible.</p>
-                <p><strong class="text-slate-950">Retain the most gold:</strong> avoids consuming cards that generate gold when possible.</p>
+        </section>
+    </main>
+
+    <div class="fixed inset-0 z-50 hidden overflow-y-auto bg-ink/60 p-4" data-modal="strategy-help" role="dialog" aria-modal="true" aria-labelledby="strategy-help-title">
+        <div class="mx-auto mt-[8vh] w-[min(560px,100%)] rounded-lg bg-paper shadow-2xl" data-modal-card>
+            <div class="torn-bottom flex items-center justify-between gap-2 rounded-t-lg bg-orc px-4 py-3 text-white">
+                <h2 class="font-display text-xl" id="strategy-help-title">Kraft Strategies</h2>
+                <button class="icon-btn size-9 hover:bg-white/10" type="button" data-modal-close aria-label="Close"><x-icon name="x" /></button>
+            </div>
+            <div class="grid gap-3 p-4 pt-6 text-sm leading-relaxed text-ink-soft">
+                <p><strong class="text-ink">Least wasted resources:</strong> finds the payment closest to the kraft cost, then prefers fewer cards when several payments waste the same amount.</p>
+                <p><strong class="text-ink">Keep the most wood / metal / leather / gold:</strong> avoids consuming cards that generate that resource whenever possible.</p>
+                <p class="rounded-md bg-sage-soft p-3 text-orc"><em>Gorbag's advice:</em> any excess resources from a kraft are lost, so waste matters.</p>
             </div>
         </div>
     </div>
+
     <script>
+        window.orcQuestHistory = {{ Illuminate\Support\Js::from($history) }};
         window.orcQuestCatalog = {{ Illuminate\Support\Js::from([
             'heroes' => $heroes->values(),
             'items' => $items->values(),

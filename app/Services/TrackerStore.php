@@ -9,6 +9,7 @@ class TrackerStore
 {
     private const PATH = 'orcquest-tracker-state.json';
     private const DEFAULT_CAMPAIGN_ID = 'default-campaign';
+    private const DEFAULT_ACTIVE_CHARACTERS = 4;
 
     public function load(?string $campaignId = null): array
     {
@@ -22,14 +23,51 @@ class TrackerStore
         return $this->normalizeState($file['campaigns'][$campaignId]['state'] ?? []);
     }
 
-    public function save(string $campaignId, array $state, string $name): string
+    /**
+     * @param  array  $events  history entries produced by TrackerHistory::diff()
+     * @return array{0: string, 1: array} the campaign id and the history entries actually stored
+     */
+    public function save(string $campaignId, array $state, string $name, array $events = []): array
     {
         $file = $this->loadFile();
         $campaignId = $campaignId ?: $this->uniqueCampaignId($name, $file);
+        $existing = $file['campaigns'][$campaignId] ?? [];
+        $name = trim($name) !== '' ? trim($name) : 'Untitled Campaign';
+
+        if (isset($existing['name']) && $existing['name'] !== $name) {
+            $events[] = $this->event('campaign', "Renamed campaign to {$name}", coalesce: 'campaign-name');
+        }
+
+        [$history, $stored] = $this->appendHistory($existing['history'] ?? [], $events);
 
         $file['campaigns'][$campaignId] = [
-            'name' => trim($name) !== '' ? trim($name) : 'Untitled Campaign',
+            'name' => $name,
             'state' => $this->normalizeState($state),
+            'history' => $history,
+            'updated_at' => now()->toDateTimeString(),
+        ];
+        $file['active_campaign_id'] = $campaignId;
+
+        $this->saveFile($file);
+
+        return [$campaignId, $stored];
+    }
+
+    /** Forks the campaign, carrying its history along so the new copy remembers how it got here. */
+    public function saveAs(array $state, string $name, ?string $fromCampaignId = null, array $events = []): string
+    {
+        $file = $this->loadFile();
+        $campaignId = $this->uniqueCampaignId($name, $file);
+        $source = $file['campaigns'][$fromCampaignId] ?? null;
+        $name = trim($name) !== '' ? trim($name) : 'Untitled Campaign';
+
+        $events[] = $this->event('campaign', $source ? "Saved as new campaign {$name} (copied from {$source['name']})" : "Created campaign {$name}");
+        [$history] = $this->appendHistory($source['history'] ?? [], $events);
+
+        $file['campaigns'][$campaignId] = [
+            'name' => $name,
+            'state' => $this->normalizeState($state),
+            'history' => $history,
             'updated_at' => now()->toDateTimeString(),
         ];
         $file['active_campaign_id'] = $campaignId;
@@ -39,21 +77,11 @@ class TrackerStore
         return $campaignId;
     }
 
-    public function saveAs(array $state, string $name): string
+    public function history(?string $campaignId = null): array
     {
         $file = $this->loadFile();
-        $campaignId = $this->uniqueCampaignId($name, $file);
 
-        $file['campaigns'][$campaignId] = [
-            'name' => trim($name) !== '' ? trim($name) : 'Untitled Campaign',
-            'state' => $this->normalizeState($state),
-            'updated_at' => now()->toDateTimeString(),
-        ];
-        $file['active_campaign_id'] = $campaignId;
-
-        $this->saveFile($file);
-
-        return $campaignId;
+        return $file['campaigns'][$campaignId ?: $file['active_campaign_id']]['history'] ?? [];
     }
 
     public function setActive(string $campaignId): void
@@ -98,6 +126,10 @@ class TrackerStore
 
         if (isset($file['campaigns'][$campaignId])) {
             $file['campaigns'][$campaignId]['state'] = $this->defaults();
+            [$file['campaigns'][$campaignId]['history']] = $this->appendHistory(
+                $file['campaigns'][$campaignId]['history'] ?? [],
+                [$this->event('campaign', 'Reset the campaign: characters, quests and notes cleared')],
+            );
             $file['campaigns'][$campaignId]['updated_at'] = now()->toDateTimeString();
             $file['active_campaign_id'] = $campaignId;
             $this->saveFile($file);
@@ -109,6 +141,7 @@ class TrackerStore
         return [
             'characters' => collect(range(1, 6))->mapWithKeys(fn (int $slot) => [
                 (string) $slot => [
+                    'active' => $slot <= self::DEFAULT_ACTIVE_CHARACTERS,
                     'player' => '',
                     'hero_id' => '',
                     'skills' => ['10' => [], '20' => [], '30' => []],
@@ -160,7 +193,14 @@ class TrackerStore
             ];
         }
 
-        return array_replace_recursive($this->emptyFile(), $saved);
+        // Shallow merge so default character values never leak into saved states before normalizeState() runs.
+        $file = array_replace($this->emptyFile(), $saved);
+
+        if (empty($file['campaigns'])) {
+            $file['campaigns'] = $this->emptyFile()['campaigns'];
+        }
+
+        return $file;
     }
 
     private function emptyFile(): array
@@ -184,6 +224,13 @@ class TrackerStore
 
     private function normalizeState(array $state): array
     {
+        // States saved before characters could be added/removed: keep any slot that holds data.
+        foreach ($state['characters'] ?? [] as $slot => $character) {
+            if (! array_key_exists('active', $character)) {
+                $state['characters'][$slot]['active'] = (int) $slot <= self::DEFAULT_ACTIVE_CHARACTERS || $this->characterHasData($character);
+            }
+        }
+
         $state = array_replace_recursive($this->defaults(), $state);
 
         foreach ($state['characters'] as &$character) {
@@ -211,6 +258,52 @@ class TrackerStore
         }
 
         return $state;
+    }
+
+    /**
+     * Appends events, folding a rapid repeat of the same text-field edit into the previous entry.
+     *
+     * @return array{0: array, 1: array} the full history and the entries added or updated
+     */
+    private function appendHistory(array $history, array $events): array
+    {
+        $stored = [];
+
+        foreach ($events as $event) {
+            $last = end($history);
+            $coalesce = $event['coalesce'] ?? null;
+
+            if ($coalesce && $last && ($last['coalesce'] ?? null) === $coalesce
+                && now()->diffInSeconds($last['at'], true) < TrackerHistory::COALESCE_SECONDS) {
+                $history[array_key_last($history)] = array_replace($last, ['text' => $event['text'], 'at' => $event['at']]);
+                $stored[] = $history[array_key_last($history)];
+                continue;
+            }
+
+            $history[] = $event;
+            $stored[] = $event;
+        }
+
+        return [$history, $stored];
+    }
+
+    private function event(string $type, string $text, ?string $coalesce = null): array
+    {
+        return array_filter([
+            'id' => (string) Str::ulid(),
+            'at' => now()->toIso8601String(),
+            'type' => $type,
+            'text' => $text,
+            'coalesce' => $coalesce,
+        ]);
+    }
+
+    private function characterHasData(array $character): bool
+    {
+        return filled($character['player'] ?? '')
+            || filled($character['hero_id'] ?? '')
+            || collect($character['equipment'] ?? [])->filter()->isNotEmpty()
+            || collect($character['inventory'] ?? [])->pluck('item')->filter()->isNotEmpty();
     }
 
     private function uniqueCampaignId(string $name, array $file): string

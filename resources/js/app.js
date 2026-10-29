@@ -1,3 +1,6 @@
+import { findKraftPlan, resourceBag, resourceNames, subtractBags } from './kraft.js';
+import { createHistoryView } from './history.js';
+
 const catalog = window.orcQuestCatalog;
 const root = document.querySelector('[data-tracker-root]');
 
@@ -12,38 +15,147 @@ if (catalog && root) {
     const all = (selector, scope = document) => Array.from(scope.querySelectorAll(selector));
     const value = (element) => element?.value || '';
     const enchantCode = (enchantValue) => enchantValue.split(' - ')[0] || '';
-    const resourceNames = ['wood', 'metal', 'leather', 'gold'];
+    const itemLabel = (itemIndex) => itemByIndex[itemIndex]?.label || itemIndex;
     const resourceIconSrc = Object.fromEntries(resourceNames.map((resource) => [resource, `/images/icons/${resource}-resource.png`]));
+    const healthColors = { Red: '#a8201a', Orange: '#d9741c', Yellow: '#d6b11c' };
     const saveStatusNodes = all('[data-save-status], [data-save-status-secondary]');
-    const activeTabClasses = 'min-h-10 rounded-md bg-emerald-800 px-4 text-sm font-extrabold text-white';
-    const inactiveTabClasses = 'min-h-10 rounded-md px-4 text-sm font-extrabold text-emerald-950 hover:bg-emerald-50';
+    const historyView = createHistoryView({ heroById });
+    historyView.add(window.orcQuestHistory || []);
+
+    // Extra context for the server-side history log, sent with the next save.
+    let historyContext = {};
 
     const setSaveStatus = (message, tone = 'idle') => {
         saveStatusNodes.forEach((node) => {
             node.textContent = message;
-            node.classList.toggle('text-slate-500', tone === 'idle');
-            node.classList.toggle('text-amber-700', tone === 'pending');
-            node.classList.toggle('text-emerald-800', tone === 'saved');
-            node.classList.toggle('text-red-700', tone === 'error');
+            node.dataset.tone = tone;
         });
+    };
+
+    const readStored = (key) => {
+        try {
+            return window.localStorage?.getItem(key);
+        } catch {
+            return null;
+        }
+    };
+
+    const writeStored = (key, stored) => {
+        try {
+            window.localStorage?.setItem(key, stored);
+        } catch {
+            // Private browsing: remembering the tab is a convenience only.
+        }
     };
 
     const showTab = (tab) => {
         all('[data-tab]').forEach((button) => {
-            const active = button.dataset.tab === tab;
-            button.className = active ? activeTabClasses : inactiveTabClasses;
-            button.setAttribute('aria-pressed', active ? 'true' : 'false');
+            button.setAttribute('aria-pressed', button.dataset.tab === tab ? 'true' : 'false');
         });
 
         all('[data-tab-panel]').forEach((panel) => {
             panel.hidden = panel.dataset.tabPanel !== tab;
         });
 
-        window.localStorage?.setItem('orcquest-active-tab', tab);
+        writeStored('orcquest-active-tab', tab);
     };
 
-    const initialTab = window.localStorage?.getItem('orcquest-active-tab') || 'characters';
-    showTab(['characters', 'resources', 'campaign'].includes(initialTab) ? initialTab : 'characters');
+    const tabs = ['characters', 'resources', 'campaign', 'history'];
+    const initialTab = readStored('orcquest-active-tab');
+    showTab(tabs.includes(initialTab) ? initialTab : 'characters');
+
+    // ---- Characters: switching, adding, removing -------------------------------------------------------
+
+    const characterCards = () => all('[data-character]');
+    const activeInput = (card) => card.querySelector('[data-character-active]');
+    const isActive = (card) => activeInput(card)?.value === '1';
+    let shownCharacter = readStored('orcquest-active-character') || null;
+
+    const showCharacter = (slot) => {
+        const active = characterCards().filter(isActive);
+
+        if (slot !== 'all' && ! active.some((card) => card.dataset.character === slot)) {
+            slot = active[0]?.dataset.character || null;
+        }
+
+        shownCharacter = slot;
+        writeStored('orcquest-active-character', slot || '');
+
+        characterCards().forEach((card) => {
+            card.hidden = ! isActive(card) || (slot !== 'all' && card.dataset.character !== slot);
+        });
+
+        all('[data-character-tab]').forEach((chip) => {
+            chip.setAttribute('aria-pressed', chip.dataset.characterTab === slot ? 'true' : 'false');
+        });
+    };
+
+    const refreshCharacterTabs = () => {
+        const cards = characterCards();
+        const activeCount = cards.filter(isActive).length;
+
+        cards.forEach((card) => {
+            const chip = document.querySelector(`[data-character-tab="${card.dataset.character}"]`);
+            if (chip) {
+                chip.hidden = ! isActive(card);
+            }
+        });
+
+        all('[data-add-character]').forEach((button) => {
+            button.hidden = activeCount >= cards.length;
+        });
+        document.querySelector('[data-character-tab="all"]')?.toggleAttribute('hidden', activeCount < 2);
+        document.querySelector('[data-no-characters]')?.toggleAttribute('hidden', activeCount > 0);
+        all('[data-remove-character]').forEach((button) => {
+            button.disabled = activeCount <= 1;
+        });
+
+        showCharacter(shownCharacter);
+    };
+
+    const addCharacter = () => {
+        const card = characterCards().find((candidate) => ! isActive(candidate));
+        if (! card) {
+            return;
+        }
+
+        activeInput(card).value = '1';
+        shownCharacter = card.dataset.character;
+        showTab('characters');
+        refresh();
+        commitHistory();
+        scheduleAutoSave();
+        card.querySelector('[data-hero-select]')?.focus();
+    };
+
+    const clearCharacter = (card) => {
+        all('input[name], select[name], textarea[name]', card).forEach((control) => {
+            if (control.matches('[data-character-active]')) {
+                return;
+            }
+
+            if (control.type === 'checkbox') {
+                control.checked = false;
+            } else {
+                control.value = '';
+            }
+        });
+    };
+
+    const removeCharacter = (card) => {
+        const name = card.querySelector('[data-hero-name]')?.textContent || `Character ${card.dataset.character}`;
+        const hasData = all('select[name], input[name]:not([type="hidden"])', card).some((control) => control.type === 'checkbox' ? control.checked : control.value);
+
+        if (hasData && ! window.confirm(`Remove ${name} from the warband? Their skills, equipment and inventory will be cleared. (Undo can bring them back.)`)) {
+            return;
+        }
+
+        clearCharacter(card);
+        activeInput(card).value = '0';
+        refresh();
+        commitHistory();
+        scheduleAutoSave();
+    };
 
     const openModal = (name) => {
         const modal = document.querySelector(`[data-modal="${name}"]`);
@@ -58,6 +170,8 @@ if (catalog && root) {
     const closeModal = (modal = document.querySelector('[data-modal]:not(.hidden)')) => {
         modal?.classList.add('hidden');
     };
+
+    // ---- Undo / redo ---------------------------------------------------------------------------------
 
     const historyState = {
         undo: [],
@@ -121,7 +235,7 @@ if (catalog && root) {
         refreshHistoryButtons();
     };
 
-    const restoreSnapshot = (snapshot) => {
+    const restoreSnapshot = (snapshot, source) => {
         historyState.restoring = true;
 
         historyControls().forEach((control, index) => {
@@ -139,6 +253,7 @@ if (catalog && root) {
         });
 
         historyState.restoring = false;
+        historyContext.source = source;
         refresh();
         scheduleAutoSave();
         refreshHistoryButtons();
@@ -151,7 +266,7 @@ if (catalog && root) {
 
         historyState.redo.push(historyState.current);
         historyState.current = historyState.undo.pop();
-        restoreSnapshot(historyState.current);
+        restoreSnapshot(historyState.current, 'undo');
     };
 
     const redoTracker = () => {
@@ -161,20 +276,10 @@ if (catalog && root) {
 
         historyState.undo.push(historyState.current);
         historyState.current = historyState.redo.pop();
-        restoreSnapshot(historyState.current);
+        restoreSnapshot(historyState.current, 'redo');
     };
 
-    const selectFromElement = (target) => {
-        if (target.matches?.('select')) {
-            return target;
-        }
-
-        return null;
-    };
-
-    const selectedValues = (selector) => all(selector)
-        .map((select) => value(select))
-        .filter(Boolean);
+    // ---- Item bundles (item + enchants + rekup travel together) ---------------------------------------
 
     const selectedValuesExcept = (selector, current) => all(selector)
         .filter((select) => select !== current)
@@ -194,12 +299,18 @@ if (catalog && root) {
 
     const handSelect = (card, key) => card.querySelector(`select[name$="[${key}]"]`);
 
+    const isInventorySelect = (select) => select?.name.includes('[inventory]');
+
+    const rekupCheckboxFor = (select) => select?.closest('[data-inventory-row]')?.querySelector('[data-rekup]') || null;
+
+    const isRekupInventoryItem = (select) => Boolean(isInventorySelect(select) && rekupCheckboxFor(select)?.checked);
+
     const enchantSelectsForItemSelect = (select) => {
         if (! select) {
             return { left: null, right: null };
         }
 
-        if (select.name.includes('[inventory]')) {
+        if (isInventorySelect(select)) {
             const row = select.closest('[data-inventory-row]');
             return {
                 left: row?.querySelector('select[name$="[left_enchant]"]') || null,
@@ -208,37 +319,23 @@ if (catalog && root) {
         }
 
         const card = select.closest('[data-character]');
-        const match = select.name.match(/\[equipment\]\[(.+)\]$/);
-        const key = match?.[1];
+        const key = select.name.match(/\[equipment\]\[(.+)\]$/)?.[1];
 
         if (! card || ! key) {
             return { left: null, right: null };
         }
 
-        if (key === 'armor_item') {
-            return {
-                left: card.querySelector('select[name$="[armor_left_enchant]"]') || null,
-                right: card.querySelector('select[name$="[armor_right_enchant]"]') || null,
-            };
-        }
-
-        if (key === 'artifact_item') {
-            return {
-                left: card.querySelector('select[name$="[artifact_left_enchant]"]') || null,
-                right: card.querySelector('select[name$="[artifact_right_enchant]"]') || null,
-            };
-        }
+        const prefix = key.replace(/_item$/, '');
 
         return {
-            left: card.querySelector(`select[name$="[${key}_left_enchant]"]`) || null,
-            right: card.querySelector(`select[name$="[${key}_right_enchant]"]`) || null,
+            left: card.querySelector(`select[name$="[${prefix}_left_enchant]"]`) || null,
+            right: card.querySelector(`select[name$="[${prefix}_right_enchant]"]`) || null,
         };
     };
 
     const itemBundleForSelect = (select) => {
         const rekup = rekupCheckboxFor(select);
         const enchants = enchantSelectsForItemSelect(select);
-
         const item = select?.value || '';
         const canHaveEnchants = item && ! itemAlwaysRekup(item);
 
@@ -288,15 +385,6 @@ if (catalog && root) {
     const firstEmptyInventorySelect = (card) => all('select[name*="[inventory]"][data-filter="item"]', card)
         .find((select) => ! select.value);
 
-    const setSelectValue = (select, nextValue) => {
-        if (! select) {
-            return;
-        }
-
-        select.value = nextValue || '';
-        select.dispatchEvent(new Event('change', { bubbles: true }));
-    };
-
     const moveItemToInventory = (card, bundle) => {
         if (! bundle?.item) {
             return false;
@@ -312,6 +400,12 @@ if (catalog && root) {
         return true;
     };
 
+    const setFieldMuted = (control, muted) => {
+        control?.closest('label')?.classList.toggle('opacity-50', muted);
+    };
+
+    // ---- Two-handed weapons ----------------------------------------------------------------------------
+
     let applyingHandRules = false;
 
     const setSecondHandMirror = (select, enabled) => {
@@ -322,8 +416,6 @@ if (catalog && root) {
         const enchants = enchantSelectsForItemSelect(select);
         select.dataset.twoHandMirror = enabled ? 'true' : 'false';
         select.disabled = enabled || select.dataset.lockedByHero === 'true';
-        select.classList.toggle('opacity-50', enabled);
-        select.classList.toggle('cursor-not-allowed', enabled);
 
         [enchants.left, enchants.right].forEach((enchant) => {
             if (! enchant) {
@@ -335,19 +427,10 @@ if (catalog && root) {
             }
 
             enchant.disabled = enabled || enchant.dataset.lockedByHero === 'true';
-            enchant.classList.toggle('opacity-50', enabled);
-            enchant.classList.toggle('cursor-not-allowed', enabled);
-
-            const enchantShell = enchant.closest('label');
-            enchantShell?.classList.toggle('opacity-50', enabled || enchant.dataset.lockedByHero === 'true');
-            enchantShell?.classList.toggle('grayscale', enabled || enchant.dataset.lockedByHero === 'true');
+            setFieldMuted(enchant, enabled || enchant.dataset.lockedByHero === 'true');
         });
 
-        const fieldShell = select.closest('label, [data-inventory-row]');
-        if (fieldShell) {
-            fieldShell.classList.toggle('opacity-50', enabled || select.dataset.lockedByHero === 'true');
-            fieldShell.classList.toggle('grayscale', enabled || select.dataset.lockedByHero === 'true');
-        }
+        setFieldMuted(select, enabled || select.dataset.lockedByHero === 'true');
     };
 
     const applyHandRules = () => {
@@ -357,7 +440,7 @@ if (catalog && root) {
 
         applyingHandRules = true;
 
-        all('[data-character]').forEach((card) => {
+        characterCards().forEach((card) => {
             const first = handSelect(card, 'hand_item_1');
             const second = handSelect(card, 'hand_item_2');
 
@@ -399,6 +482,8 @@ if (catalog && root) {
         applyingHandRules = false;
     };
 
+    // ---- Option filtering (each card / hero / enchant can only be in one place) ------------------------
+
     const setOptionAvailability = (select, isUnavailable) => {
         Array.from(select.options).forEach((option) => {
             if (! option.value) {
@@ -419,9 +504,10 @@ if (catalog && root) {
             setOptionAvailability(select, (optionValue) => used.includes(optionValue));
         });
 
+        const usedItems = all('select[data-filter="item"]').map((select) => value(select));
         all('select[data-filter="item"]').forEach((select) => {
-            const used = selectedValuesExcept('select[data-filter="item"]', select);
-            setOptionAvailability(select, (optionValue) => used.includes(optionValue));
+            const used = new Set(usedItems.filter((itemIndex) => itemIndex && itemIndex !== select.value));
+            setOptionAvailability(select, (optionValue) => used.has(optionValue));
         });
 
         all('select[data-filter="enchant"]').forEach((select) => {
@@ -430,41 +516,59 @@ if (catalog && root) {
         });
     };
 
+    // ---- Skills: hero-specific options; show filled slots plus one empty slot per tier -----------------
+
     const refreshSkills = () => {
-        all('[data-character]').forEach((card) => {
+        characterCards().forEach((card) => {
             const hero = heroById[value(card.querySelector('[data-hero-select]'))];
             const skills = hero?.skills || { 10: [], 20: [], 30: [] };
 
-            all('select[data-skill-tier]', card).forEach((select) => {
-                const tier = select.dataset.skillTier;
-                const current = skills[tier]?.includes(select.value) ? select.value : '';
-                const used = all(`select[data-skill-tier="${tier}"]`, card)
-                    .filter((other) => other !== select)
-                    .map((other) => other.value)
-                    .filter(Boolean);
+            ['10', '20', '30'].forEach((tier) => {
+                const selects = all(`select[data-skill-tier="${tier}"]`, card);
+                let shownEmpty = false;
 
-                select.replaceChildren(new Option('Empty', ''));
+                selects.forEach((select) => {
+                    const current = skills[tier]?.includes(select.value) ? select.value : '';
+                    const used = selects
+                        .filter((other) => other !== select)
+                        .map((other) => other.value)
+                        .filter(Boolean);
 
-                (skills[tier] || []).forEach((skill) => {
-                    if (used.includes(skill) && skill !== current) {
-                        return;
+                    select.replaceChildren(new Option(hero ? 'Add a skill…' : 'Choose a hero first', ''));
+
+                    (skills[tier] || []).forEach((skill) => {
+                        if (used.includes(skill) && skill !== current) {
+                            return;
+                        }
+
+                        select.add(new Option(skill, skill, false, skill === current));
+                    });
+
+                    select.value = current;
+
+                    const slot = select.closest('[data-skill-slot]');
+                    if (slot) {
+                        slot.hidden = ! current && shownEmpty;
+                        shownEmpty ||= ! current;
                     }
-
-                    select.add(new Option(skill, skill, false, skill === current));
                 });
-
-                select.value = current;
             });
         });
     };
 
-    const setWeightBadge = (badge, label, used, limit) => {
-        badge.textContent = `${label} ${used}/${limit || '-'}`;
+    // ---- Character header: facts, weights, chips, tray summaries ---------------------------------------
+
+    const setWeightMeter = (meter, used, limit) => {
+        if (! meter) {
+            return false;
+        }
+
         const over = Boolean(limit && used > limit);
-        badge.classList.toggle('bg-red-50', over);
-        badge.classList.toggle('text-red-700', over);
-        badge.classList.toggle('bg-emerald-50', ! over);
-        badge.classList.toggle('text-emerald-950', ! over);
+        meter.dataset.over = over ? 'true' : 'false';
+        meter.querySelector('[data-weight-value]').textContent = `${used}/${limit || '–'}`;
+        meter.querySelector('[data-weight-bar]').style.width = `${limit ? Math.min(100, Math.round((used / limit) * 100)) : 0}%`;
+
+        return over;
     };
 
     const plural = (count, singular, pluralLabel = `${singular}s`) => `${count} ${count === 1 ? singular : pluralLabel}`;
@@ -477,84 +581,93 @@ if (catalog && root) {
     };
 
     const refreshTraySummaries = (card) => {
-        const skillCounts = ['10', '20', '30'].map((tier) => ({
-            tier,
-            count: all(`select[data-skill-tier="${tier}"]`, card).filter((select) => select.value).length,
-        }));
-        const totalSkills = skillCounts.reduce((total, tier) => total + tier.count, 0);
-        setTraySummary(
-            card,
-            'skills',
-            totalSkills
-                ? `${plural(totalSkills, 'card')} / ${skillCounts.map((tier) => `${tier.tier} BP: ${tier.count}`).join(' / ')}`
-                : 'No skills purchased',
-        );
+        const skillCounts = ['10', '20', '30'].map((tier) => {
+            const count = all(`select[data-skill-tier="${tier}"]`, card).filter((select) => select.value).length;
+            const counter = card.querySelector(`[data-skill-count="${tier}"]`);
+            if (counter) {
+                counter.textContent = count;
+            }
 
-        const firstHand = value(handSelect(card, 'hand_item_1')) || 'None';
-        const secondHandSelect = handSelect(card, 'hand_item_2');
-        const secondHand = secondHandSelect?.dataset.twoHandMirror === 'true'
-            ? 'Mirrored'
-            : (value(secondHandSelect) || 'None');
-        const armor = value(card.querySelector('select[name$="[armor_item]"]')) || 'None';
-        const artifact = value(card.querySelector('select[name$="[artifact_item]"]')) || 'None';
-        const enchantCount = all('select[data-filter="enchant"]', card).filter((select) => select.value).length;
-        const equippedCount = [firstHand, secondHand, armor, artifact].filter((item) => ! ['None', 'Mirrored'].includes(item)).length;
-        setTraySummary(
-            card,
-            'equipment',
-            equippedCount
-                ? `Hands: ${firstHand} / ${secondHand} / Armor: ${armor} / Artifact: ${artifact} / ${plural(enchantCount, 'enchant')}`
-                : 'No equipment selected',
-        );
+            return count;
+        });
+        const totalSkills = skillCounts.reduce((total, count) => total + count, 0);
+        setTraySummary(card, 'skills', totalSkills ? `${plural(totalSkills, 'card')} learned` : 'None learned');
+
+        const equipped = all('select[data-filter="item"][name*="[equipment]"]', card)
+            .filter((select) => select.value && select.dataset.twoHandMirror !== 'true').length;
+        const enchantCount = all('select[data-filter="enchant"][name*="[equipment]"]', card).filter((select) => select.value).length;
+        setTraySummary(card, 'equipment', equipped
+            ? `${plural(equipped, 'item')} equipped${enchantCount ? ` · ${plural(enchantCount, 'enchant')}` : ''}`
+            : 'Nothing equipped');
 
         const inventoryRows = all('[data-inventory-row]', card);
         const filledRows = inventoryRows.filter((row) => value(row.querySelector('select[data-filter="item"]')));
         const rekupRows = filledRows.filter((row) => row.querySelector('[data-rekup]')?.checked);
-        const carriedRows = filledRows.length - rekupRows.length;
-        const emptyRows = inventoryRows.length - filledRows.length;
-        setTraySummary(
-            card,
-            'inventory',
-            filledRows.length
-                ? `${plural(carriedRows, 'carried item')} / ${plural(rekupRows.length, 'rekup card')} / ${plural(emptyRows, 'empty slot')}`
-                : 'No inventory items',
-        );
+        setTraySummary(card, 'inventory', filledRows.length
+            ? `${plural(filledRows.length - rekupRows.length, 'item')} · ${rekupRows.length} rekup · ${inventoryRows.length - filledRows.length} free`
+            : 'Empty');
+    };
+
+    const heroFactPill = (text, color) => {
+        const pill = document.createElement('span');
+        pill.className = 'pill';
+
+        if (color) {
+            const dot = document.createElement('span');
+            dot.className = 'size-2.5 rounded-full';
+            dot.style.background = color;
+            pill.append(dot);
+        }
+
+        pill.append(document.createTextNode(text));
+
+        return pill;
     };
 
     const refreshHeroPanels = () => {
-        all('[data-character]').forEach((card) => {
+        characterCards().forEach((card) => {
+            const slot = card.dataset.character;
             const hero = heroById[value(card.querySelector('[data-hero-select]'))];
-            const heroName = card.querySelector('[data-hero-name]');
             const heroIcon = card.querySelector('[data-hero-icon]');
             const facts = card.querySelector('[data-hero-facts]');
+            const chip = document.querySelector(`[data-character-tab="${slot}"]`);
+            const player = value(card.querySelector('[data-player-input]')).trim();
 
-            heroName.textContent = hero?.name || 'Unassigned Hero';
+            card.querySelector('[data-hero-name]').textContent = hero?.name || 'Unassigned Hero';
+
+            [heroIcon, chip?.querySelector('[data-chip-icon]')].forEach((icon) => {
+                if (! icon) {
+                    return;
+                }
+
+                if (hero?.icon) {
+                    icon.src = hero.icon;
+                    icon.hidden = false;
+                } else {
+                    icon.removeAttribute('src');
+                    icon.hidden = true;
+                }
+            });
 
             if (heroIcon) {
-                if (hero?.icon) {
-                    heroIcon.src = hero.icon;
-                    heroIcon.alt = `${hero.name} icon`;
-                    heroIcon.hidden = false;
-                } else {
-                    heroIcon.removeAttribute('src');
-                    heroIcon.alt = 'No hero selected';
-                    heroIcon.hidden = true;
-                }
+                heroIcon.alt = hero ? `${hero.name} portrait` : '';
+            }
+
+            if (chip) {
+                chip.querySelector('[data-chip-name]').textContent = hero?.name || `Character ${slot}`;
+                chip.querySelector('[data-chip-player]').textContent = player || 'No player';
             }
 
             if (facts) {
                 facts.replaceChildren();
+                facts.hidden = ! hero;
 
                 if (hero) {
-                    [hero.class, `${hero.base_health} ${hero.health_color} health`, hero.starting_stuff].forEach((fact) => {
-                        const pill = document.createElement('span');
-                        pill.className = 'rounded-md bg-amber-50 px-2 py-1.5 text-xs font-extrabold text-amber-900';
-                        pill.textContent = fact;
-                        facts.appendChild(pill);
-                    });
-                    facts.hidden = false;
-                } else {
-                    facts.hidden = true;
+                    facts.append(
+                        heroFactPill(hero.class),
+                        heroFactPill(`${hero.base_health} ${hero.health_color} health`, healthColors[hero.health_color] || '#776e62'),
+                        heroFactPill(`Starts with ${hero.starting_stuff}`),
+                    );
                 }
             }
 
@@ -570,120 +683,78 @@ if (catalog && root) {
 
                 control.dataset.lockedByHero = hero ? 'false' : 'true';
                 control.disabled = ! hero || control.dataset.twoHandMirror === 'true' || alwaysRekup;
-                control.classList.toggle('cursor-not-allowed', ! hero);
-                control.classList.toggle('opacity-50', ! hero || alwaysRekup);
-
-                const fieldShell = control.closest('label, [data-inventory-row]');
-                if (fieldShell) {
-                    fieldShell.classList.toggle('opacity-50', ! hero || alwaysRekup);
-                    fieldShell.classList.toggle('grayscale', ! hero || alwaysRekup);
-                }
+                setFieldMuted(control, ! hero || alwaysRekup);
             });
 
             let inventoryWeight = 0;
-            let handWeight = 0;
-            let armorWeight = 0;
 
             all('select[name*="[inventory]"][data-filter="item"]', card).forEach((select) => {
-                const row = select.closest('[data-inventory-row]');
-                const isRekup = row?.querySelector('[data-rekup]')?.checked;
+                const isRekup = rekupCheckboxFor(select)?.checked;
                 inventoryWeight += isRekup ? 1 : Number(itemByIndex[select.value]?.weight || 0);
             });
 
             const firstHand = handSelect(card, 'hand_item_1');
             const secondHand = handSelect(card, 'hand_item_2');
-            handWeight += Number(itemByIndex[value(firstHand)]?.weight || 0);
+            let handWeight = Number(itemByIndex[value(firstHand)]?.weight || 0);
             if (value(secondHand) && value(secondHand) !== value(firstHand)) {
                 handWeight += Number(itemByIndex[value(secondHand)]?.weight || 0);
             }
 
-            armorWeight = Number(itemByIndex[value(card.querySelector('select[name$="[armor_item]"]'))]?.weight || 0);
+            const armorWeight = Number(itemByIndex[value(card.querySelector('select[name$="[armor_item]"]'))]?.weight || 0);
 
-            setWeightBadge(card.querySelector('[data-weight="inventory"]'), 'Inv', inventoryWeight, Number(hero?.inventory_weight_limit || 0));
-            setWeightBadge(card.querySelector('[data-weight="hands"]'), 'Hands', handWeight, Number(hero?.hand_weight_limit || 0));
-            setWeightBadge(card.querySelector('[data-weight="armor"]'), 'Armor', armorWeight, Number(hero?.armor_weight_limit || 0));
+            const overInventory = setWeightMeter(card.querySelector('[data-weight="inventory"]'), inventoryWeight, Number(hero?.inventory_weight_limit || 0));
+            const overHands = setWeightMeter(card.querySelector('[data-weight="hands"]'), handWeight, Number(hero?.hand_weight_limit || 0));
+            const overArmor = setWeightMeter(card.querySelector('[data-weight="armor"]'), armorWeight, Number(hero?.armor_weight_limit || 0));
+            chip?.querySelector('[data-chip-alert]')?.toggleAttribute('hidden', ! (overInventory || overHands || overArmor));
+
             refreshTraySummaries(card);
         });
     };
 
+    // ---- Rekup pool, upgrades and the kraft planner ----------------------------------------------------
+
+    const characterName = (card) => heroById[value(card.querySelector('[data-hero-select]'))]?.name || `Character ${card.dataset.character}`;
+
     const currentResources = () => {
-        const totals = { wood: 0, metal: 0, leather: 0, gold: 0 };
+        const totals = resourceBag();
 
-        all('[data-character]').forEach((card) => {
-            all('select[name*="[inventory]"][data-filter="item"]', card).forEach((select) => {
-                const row = select.closest('[data-inventory-row]');
-                if (! row?.querySelector('[data-rekup]')?.checked) {
-                    return;
-                }
+        all('select[name*="[inventory]"][data-filter="item"]').forEach((select) => {
+            if (! rekupCheckboxFor(select)?.checked) {
+                return;
+            }
 
-                const item = itemByIndex[select.value];
-                Object.keys(totals).forEach((resource) => {
-                    totals[resource] += Number(item?.rekup?.[resource] || 0);
-                });
+            const item = itemByIndex[select.value];
+            resourceNames.forEach((resource) => {
+                totals[resource] += Number(item?.rekup?.[resource] || 0);
             });
         });
 
         return totals;
     };
 
-    const ownedItems = (card) => {
-        const owned = [];
+    const ownedItems = (card) => all('select[data-filter="item"]', card)
+        .filter((select) => select.value && select.dataset.twoHandMirror !== 'true')
+        .map((select) => ({
+            key: `${card.dataset.character}|${select.name}`,
+            index: select.value,
+            item: itemByIndex[select.value],
+            characterSlot: card.dataset.character,
+            character: characterName(card),
+            rekup: isRekupInventoryItem(select),
+            location: select.dataset.location || 'Equipment',
+            select,
+        }));
 
-        all('select[data-filter="item"]', card).forEach((select) => {
-            if (! select.value) {
-                return;
-            }
+    const canAfford = (item, resources) => resourceNames.every((resource) => Number(item?.kraft?.[resource] || 0) <= resources[resource]);
 
-            if (select.dataset.twoHandMirror === 'true') {
-                return;
-            }
-
-            const row = select.closest('[data-inventory-row]');
-            const isInventory = select.name.includes('[inventory]');
-            owned.push({
-                key: `${card.dataset.character}|${select.name}`,
-                index: select.value,
-                characterSlot: card.dataset.character,
-                rekup: Boolean(isInventory && row?.querySelector('[data-rekup]')?.checked),
-                location: isInventory ? 'Inventory' : select.previousElementSibling?.textContent || 'Equipment',
-                select,
-            });
-        });
-
-        return owned;
-    };
-
-    const canAfford = (item, resources) => Object.keys(resources)
-        .every((resource) => Number(item?.kraft?.[resource] || 0) <= resources[resource]);
-
-    const resourceBag = (source = {}) => Object.fromEntries(
-        resourceNames.map((resource) => [resource, Number(source?.[resource] || 0)])
-    );
-
-    const addBags = (left, right) => Object.fromEntries(
-        resourceNames.map((resource) => [resource, Number(left[resource] || 0) + Number(right[resource] || 0)])
-    );
-
-    const subtractBags = (left, right) => Object.fromEntries(
-        resourceNames.map((resource) => [resource, Math.max(0, Number(left[resource] || 0) - Number(right[resource] || 0))])
-    );
-
-    const resourceIcon = (resource, sizeClass = 'h-4 w-4') => {
+    const resourceIcon = (resource) => {
         const icon = document.createElement('img');
-        icon.className = `${sizeClass} object-contain`;
+        icon.className = 'size-4 object-contain';
         icon.src = resourceIconSrc[resource];
-        icon.alt = `${resource.charAt(0).toUpperCase()}${resource.slice(1)} resource icon`;
+        icon.alt = resource;
         icon.title = resource;
 
         return icon;
-    };
-
-    const resourceAmountNode = (resource, amount, tone = 'text-slate-600') => {
-        const node = document.createElement('span');
-        node.className = `inline-flex items-center gap-1 whitespace-nowrap ${tone}`;
-        node.append(resourceIcon(resource), document.createTextNode(String(Number(amount || 0))));
-
-        return node;
     };
 
     const appendResourceAmounts = (node, bag, options = {}) => {
@@ -696,167 +767,57 @@ if (catalog && root) {
             return;
         }
 
-        resources.forEach((resource, index) => {
-            if (index > 0) {
-                node.append(document.createTextNode(' / '));
-            }
-
-            node.append(resourceAmountNode(resource, bag?.[resource] || 0, options.tone || 'text-slate-600'));
+        resources.forEach((resource) => {
+            const amount = Number(bag?.[resource] || 0);
+            const chip = document.createElement('span');
+            chip.className = `inline-flex items-center gap-1 tabular-nums${amount ? '' : ' opacity-40'}`;
+            chip.append(resourceIcon(resource), document.createTextNode(String(amount)));
+            node.append(chip);
         });
     };
 
-    const allOwnedUpgradeableItems = () => all('[data-character]').flatMap((card) => {
-        const hero = heroById[value(card.querySelector('[data-hero-select]'))];
+    const allOwnedUpgradeableItems = () => characterCards()
+        .flatMap((card) => ownedItems(card))
+        .filter((owned) => ! owned.rekup && owned.item?.can_upgrade);
 
-        return ownedItems(card)
-            .map((owned) => ({
-                ...owned,
-                item: itemByIndex[owned.index],
-                character: hero?.name || `Character ${card.dataset.character}`,
-            }))
-            .filter((owned) => ! owned.rekup && owned.item?.can_upgrade);
-    });
+    const paymentCandidatesFor = (targetKey) => characterCards().flatMap((card) => all('select[name*="[inventory]"][data-filter="item"]', card)
+        .filter((select) => select.value)
+        .map((select) => ({
+            key: `${card.dataset.character}|${select.name}`,
+            index: select.value,
+            character: characterName(card),
+            location: select.dataset.location,
+            rekup: isRekupInventoryItem(select),
+            resources: resourceBag(itemByIndex[select.value]?.rekup),
+            select,
+        }))
+        .filter((candidate) => candidate.key !== targetKey));
 
-    const paymentCandidatesFor = (targetKey) => all('[data-character]').flatMap((card) => {
-        const hero = heroById[value(card.querySelector('[data-hero-select]'))];
+    const ownedIndexes = () => new Set(all('select[data-filter="item"]').map((select) => select.value).filter(Boolean));
 
-        return all('select[name*="[inventory]"][data-filter="item"]', card)
-            .map((select) => {
-                const row = select.closest('[data-inventory-row]');
-                const item = itemByIndex[select.value];
-
-                return {
-                    key: `${card.dataset.character}|${select.name}`,
-                    index: select.value,
-                    character: hero?.name || `Character ${card.dataset.character}`,
-                    location: `Inventory ${all('select[name*="[inventory]"][data-filter="item"]', card).indexOf(select) + 1}`,
-                    rekup: Boolean(row?.querySelector('[data-rekup]')?.checked),
-                    item,
-                    resources: resourceBag(item?.rekup),
-                    select,
-                };
-            })
-            .filter((candidate) => candidate.index && candidate.key !== targetKey)
-            .filter((candidate) => resourceNames.some((resource) => candidate.resources[resource] > 0));
-    });
-
-    const scorePlan = (plan, strategy, cost) => {
-        const wasted = resourceNames.reduce((total, resource) => total + Math.max(0, plan.resources[resource] - cost[resource]), 0);
-        const totalResources = resourceNames.reduce((total, resource) => total + plan.resources[resource], 0);
-
-        const base = {
-            least_waste: [wasted, plan.cards.length, totalResources],
-            retain_wood: [plan.resources.wood, wasted, plan.cards.length, totalResources],
-            retain_gold: [plan.resources.gold, wasted, plan.cards.length, totalResources],
-            retain_metal: [plan.resources.metal, wasted, plan.cards.length, totalResources],
-            retain_leather: [plan.resources.leather, wasted, plan.cards.length, totalResources],
-        };
-
-        return base[strategy] || base.least_waste;
-    };
-
-    const isBetterPlan = (next, current, strategy, cost) => {
-        if (! current) {
-            return true;
-        }
-
-        const nextScore = scorePlan(next, strategy, cost);
-        const currentScore = scorePlan(current, strategy, cost);
-
-        return nextScore.some((score, index) => score < currentScore[index] && nextScore.slice(0, index).every((valueAtIndex, previousIndex) => valueAtIndex === currentScore[previousIndex]));
-    };
-
-    const findKraftPlan = (target, resources, strategy) => {
-        const cost = resourceBag(target.item.kraft);
-        const missing = subtractBags(cost, resources);
-
-        const candidates = paymentCandidatesFor(target.key)
-            .filter((candidate) => resourceNames.some((resource) => cost[resource] > 0 && candidate.resources[resource] > 0));
-
-        if (! candidates.length) {
-            return { missing, cards: [], resources: resourceBag(), cost, waste: resourceBag(), craftableNow: false };
-        }
-
-        const caps = Object.fromEntries(resourceNames.map((resource) => [
-            resource,
-            cost[resource] + Math.max(...candidates.map((candidate) => candidate.resources[resource]), 0),
-        ]));
-        const stateKey = (bag) => resourceNames.map((resource) => bag[resource]).join('|');
-        const capBag = (bag) => Object.fromEntries(resourceNames.map((resource) => [
-            resource,
-            Math.min(caps[resource], Number(bag[resource] || 0)),
-        ]));
-        const coversCost = (bag) => resourceNames.every((resource) => bag[resource] >= cost[resource]);
-        const bestForState = new Map([[stateKey(resourceBag()), { cards: [], resources: resourceBag() }]]);
-
-        candidates.forEach((candidate) => {
-            Array.from(bestForState.values()).forEach((plan) => {
-                if (plan.cards.some((card) => card.key === candidate.key)) {
-                    return;
-                }
-
-                const next = {
-                    cards: [...plan.cards, candidate],
-                    resources: capBag(addBags(plan.resources, candidate.resources)),
-                };
-                const key = stateKey(next.resources);
-                const current = bestForState.get(key);
-
-                if (! current || next.cards.length < current.cards.length) {
-                    bestForState.set(key, next);
-                }
-            });
-        });
-
-        const plan = Array.from(bestForState.values())
-            .filter((candidatePlan) => candidatePlan.cards.length && coversCost(candidatePlan.resources))
-            .reduce((best, candidatePlan) => (isBetterPlan(candidatePlan, best, strategy, cost) ? candidatePlan : best), null);
-
-        if (! plan) {
-            return { missing, cards: [], resources: resourceBag(), cost, waste: resourceBag(), craftableNow: false };
-        }
-
-        return {
-            ...plan,
-            missing,
-            cost,
-            waste: subtractBags(plan.resources, cost),
-            craftableNow: plan.cards.every((card) => card.rekup),
-        };
-    };
-
-    const refreshKraftTargetOptions = (targets) => {
-        const select = document.querySelector('[data-kraft-target]');
-        if (! select) {
+    const nextLevelFor = (item) => {
+        if (! item?.level) {
             return null;
         }
 
-        const current = select.value;
-        select.replaceChildren(new Option('Choose an owned upgradeable item', ''));
+        const owned = ownedIndexes();
 
-        targets.forEach((target) => {
-            select.add(new Option(`${target.item.index} - ${target.character} / ${target.location}`, target.key));
-        });
-
-        select.value = targets.some((target) => target.key === current) ? current : '';
-
-        return targets.find((target) => target.key === select.value) || null;
+        return items.find((candidate) => candidate.name === item.name && candidate.level === item.level + 1 && ! owned.has(candidate.index)) || null;
     };
 
-    const currentKraftPlan = (resources = currentResources()) => {
+    const currentKraftPlan = () => {
         const targets = allOwnedUpgradeableItems();
-        const targetSelect = document.querySelector('[data-kraft-target]');
-        const target = targets.find((owned) => owned.key === targetSelect?.value) || null;
+        const target = targets.find((owned) => owned.key === value(document.querySelector('[data-kraft-target]'))) || null;
         const strategy = value(document.querySelector('[data-kraft-strategy]')) || 'least_waste';
 
         return {
             target,
-            plan: target ? findKraftPlan(target, resources, strategy) : null,
+            plan: target ? findKraftPlan(target.item.kraft, paymentCandidatesFor(target.key), strategy) : null,
         };
     };
 
     const compactInventories = () => {
-        all('[data-character]').forEach((card) => {
+        characterCards().forEach((card) => {
             const selects = all('select[name*="[inventory]"][data-filter="item"]', card);
             const rows = selects
                 .map((select) => itemBundleForSelect(select))
@@ -869,24 +830,43 @@ if (catalog && root) {
     };
 
     const consumeKraftPaymentCards = () => {
-        const { plan } = currentKraftPlan();
+        const { target, plan } = currentKraftPlan();
 
-        if (! plan?.cards?.length) {
+        if (! target || ! plan) {
             return;
         }
 
-        plan.cards.forEach((card) => {
-            if (! card.select) {
-                return;
-            }
+        const next = nextLevelFor(target.item);
+        const paid = plan.cards.map((card) => `${itemLabel(card.index)} (${card.character})`).join(', ');
+        const summary = next
+            ? `Krafted ${target.item.label} into ${next.label}`
+            : `Paid the kraft for ${target.item.label} (no free ${target.item.name} card of the next level to swap in)`;
 
-            setItemBundle(card.select, null);
-        });
+        historyContext.kraft = {
+            text: plan.cards.length ? `${summary}, consuming ${paid}` : `${summary} at no cost`,
+            slot: target.characterSlot,
+            consumed: plan.cards.map((card) => card.index),
+        };
+
+        plan.cards.forEach((card) => setItemBundle(card.select, null));
+
+        // Enchanted stuff keeps its enchants when krafted, so only the item card changes.
+        if (next) {
+            target.select.value = next.index;
+        }
 
         compactInventories();
         refresh();
         commitHistory();
         scheduleAutoSave();
+    };
+
+    const emptyNote = (text, tone = 'text-muted') => {
+        const note = document.createElement('p');
+        note.className = `text-sm ${tone}`;
+        note.textContent = text;
+
+        return note;
     };
 
     const renderKraftSummary = (target, resources, plan) => {
@@ -898,46 +878,39 @@ if (catalog && root) {
         summary.replaceChildren();
 
         if (! target) {
-            const empty = document.createElement('p');
-            empty.className = 'text-sm font-bold text-slate-500';
-            empty.textContent = 'Choose a target to plan a kraft.';
-            summary.appendChild(empty);
+            summary.append(emptyNote('Choose an upgrade target to plan its kraft.'));
             return;
         }
 
         const cost = resourceBag(target.item.kraft);
+        const missing = subtractBags(cost, resources);
+        const next = nextLevelFor(target.item);
         const rows = [
-            ['Target', { text: `${target.item.index} - ${target.character} / ${target.location}` }],
-            ['Current pool', { bag: resources }],
+            ['Target', { text: `${target.item.label} · ${target.character}, ${target.location}` }],
+            ['Becomes', { text: next ? next.label : `No free ${target.item.name} card of the next level` }],
             ['Kraft cost', { bag: cost }],
-            ['Missing now', { bag: plan.missing, onlyPositive: true, emptyText: 'Nothing missing' }],
-            ['Suggested payment', { bag: plan.resources }],
-            ['Payment waste', { bag: plan.waste }],
+            ['Rekup pool', { bag: resources }],
+            ['Missing now', { bag: missing, onlyPositive: true, emptyText: 'Nothing, the pool covers it', alarm: true }],
+            ['Payment', { bag: plan?.resources || resourceBag() }],
+            ['Wasted', { bag: plan?.waste || resourceBag() }],
         ];
 
         rows.forEach(([label, detail]) => {
-            const hasMissingResources = label === 'Missing now'
-                && resourceNames.some((resource) => Number(plan.missing?.[resource] || 0) > 0);
+            const alarm = detail.alarm && resourceNames.some((resource) => missing[resource] > 0);
             const row = document.createElement('div');
-            row.className = 'grid gap-1 border-t border-slate-200 py-2 first:border-t-0 sm:grid-cols-[9rem_1fr]';
-            const title = document.createElement('strong');
-            title.className = hasMissingResources
-                ? 'text-xs uppercase text-red-700'
-                : 'text-xs uppercase text-slate-500';
+            row.className = 'grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-2 border-t border-line py-1.5 first:border-t-0';
+            const title = document.createElement('span');
+            title.className = `text-[11px] font-semibold uppercase tracking-wide ${alarm ? 'text-danger' : 'text-muted'}`;
             title.textContent = label;
             const valueNode = document.createElement('span');
-            valueNode.className = hasMissingResources
-                ? 'flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-red-700'
-                : 'flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-slate-900';
+            valueNode.className = `flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-medium ${alarm ? 'text-danger' : 'text-ink'}`;
+
             if (detail.text) {
                 valueNode.textContent = detail.text;
             } else {
-                appendResourceAmounts(valueNode, detail.bag, {
-                    onlyPositive: detail.onlyPositive,
-                    emptyText: detail.emptyText,
-                    tone: hasMissingResources ? 'text-red-700' : 'text-slate-900',
-                });
+                appendResourceAmounts(valueNode, detail.bag, detail);
             }
+
             row.append(title, valueNode);
             summary.appendChild(row);
         });
@@ -952,53 +925,60 @@ if (catalog && root) {
         suggestion.replaceChildren();
 
         if (! target) {
-            const empty = document.createElement('p');
-            empty.className = 'text-sm font-bold text-slate-500';
-            empty.textContent = 'Exact payment cards will appear here.';
-            suggestion.appendChild(empty);
+            suggestion.append(emptyNote('The exact cards to consume will appear here.'));
             return;
         }
 
-        if (! plan.cards.length) {
-            const blocked = document.createElement('p');
-            blocked.className = 'text-sm font-extrabold text-red-700';
-            blocked.textContent = 'No available inventory card combination can pay this kraft cost.';
-            suggestion.appendChild(blocked);
+        if (! plan) {
+            suggestion.append(emptyNote('No combination of inventory cards can pay this kraft cost yet.', 'text-danger font-medium'));
             return;
         }
 
-        const intro = document.createElement('p');
-        intro.className = 'mb-2 text-sm font-extrabold text-emerald-950';
-        intro.textContent = `Consume these ${plan.cards.length} card${plan.cards.length === 1 ? '' : 's'} to pay:`;
-        suggestion.appendChild(intro);
+        const next = nextLevelFor(target.item);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn btn-primary mb-3 w-full';
+        button.dataset.consumeKraftCards = 'true';
+        button.textContent = next
+            ? (plan.cards.length ? `Kraft it: consume ${plural(plan.cards.length, 'card')} → ${next.label}` : `Kraft it → ${next.label}`)
+            : `Consume ${plural(plan.cards.length, 'payment card')}`;
 
-        const consumeButton = document.createElement('button');
-        consumeButton.className = 'mb-2 min-h-10 rounded-md bg-red-700 px-4 text-sm font-extrabold text-white hover:bg-red-800';
-        consumeButton.type = 'button';
-        consumeButton.dataset.consumeKraftCards = 'true';
-        consumeButton.textContent = 'Consume Payment Cards';
-        suggestion.appendChild(consumeButton);
+        if (plan.free) {
+            suggestion.append(emptyNote('This upgrade has no kraft cost.', 'mb-2 text-sm font-medium text-orc-700'), button);
+            return;
+        }
 
+        suggestion.append(button);
+
+        const needsMarking = plan.cards.filter((card) => ! card.rekup).length;
+        if (needsMarking) {
+            suggestion.append(emptyNote(`${plural(needsMarking, 'card')} below ${needsMarking === 1 ? 'is' : 'are'} still carried as gear; the pool alone can't pay this.`, 'mb-2 text-xs font-medium text-[#8a4210]'));
+        }
+
+        const list = document.createElement('ul');
         plan.cards.forEach((card) => {
-            const row = document.createElement('div');
-            row.className = 'grid gap-1 border-t border-slate-200 py-2 first:border-t-0 md:grid-cols-[1fr_auto]';
-            const item = document.createElement('strong');
-            item.className = 'block';
-            item.textContent = card.index;
-            const meta = document.createElement('small');
-            meta.className = 'mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-500';
-            meta.append(document.createTextNode(`${card.character} / ${card.location} / `));
-            appendResourceAmounts(meta, card.resources);
+            const row = document.createElement('li');
+            row.className = 'flex items-start justify-between gap-2 border-t border-line py-2 first:border-t-0';
+            const left = document.createElement('div');
+            left.className = 'min-w-0';
+            const name = document.createElement('strong');
+            name.className = 'block text-sm font-semibold';
+            name.textContent = itemLabel(card.index);
+            const meta = document.createElement('span');
+            meta.className = 'mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted';
+            meta.append(document.createTextNode(`${card.character} · ${card.location}`));
+            appendResourceAmounts(meta, card.resources, { onlyPositive: true });
+            left.append(name, meta);
+
             const status = document.createElement('span');
             status.className = card.rekup
-                ? 'w-max rounded-md bg-emerald-50 px-2 py-1 text-xs font-extrabold text-emerald-800'
-                : 'w-max rounded-md bg-amber-50 px-2 py-1 text-xs font-extrabold text-amber-800';
-            status.textContent = card.rekup ? 'In rekup pool' : 'Mark rekup first';
-            const left = document.createElement('div');
-            left.append(item, meta);
+                ? 'shrink-0 rounded-full bg-sage-soft px-2 py-0.5 text-[11px] font-semibold text-orc-700'
+                : 'shrink-0 rounded-full bg-ember/15 px-2 py-0.5 text-[11px] font-semibold text-[#8a4210]';
+            status.textContent = card.rekup ? 'In pool' : 'Carried';
             row.append(left, status);
-            suggestion.appendChild(row);
+            list.appendChild(row);
         });
+        suggestion.append(list);
     };
 
     const renderAlmostCraftable = (targets, resources) => {
@@ -1012,29 +992,30 @@ if (catalog && root) {
         const rows = targets
             .map((target) => ({ target, missing: subtractBags(resourceBag(target.item.kraft), resources) }))
             .filter(({ missing }) => resourceNames.some((resource) => missing[resource] > 0))
+            .sort((left, right) => resourceNames.reduce((sum, resource) => sum + left.missing[resource], 0) - resourceNames.reduce((sum, resource) => sum + right.missing[resource], 0))
             .slice(0, 9);
 
         if (! rows.length) {
-            const empty = document.createElement('p');
-            empty.className = 'text-sm font-bold text-slate-500';
-            empty.textContent = 'No blocked owned upgrades right now.';
-            list.appendChild(empty);
+            list.append(emptyNote('No blocked upgrades right now.'));
             return;
         }
 
         rows.forEach(({ target, missing }) => {
-            const card = document.createElement('div');
-            card.className = 'rounded-md border border-slate-200 bg-white p-3';
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = 'rounded-md border border-line bg-white/70 p-2.5 text-left hover:border-orc-600';
+            card.dataset.kraftPick = target.key;
+            card.title = 'Plan this kraft';
             const title = document.createElement('strong');
-            title.className = 'block text-sm';
-            title.textContent = target.item.index;
-            const meta = document.createElement('small');
-            meta.className = 'mt-1 block text-slate-500';
-            meta.textContent = `${target.character} / ${target.location}`;
+            title.className = 'block text-sm font-semibold';
+            title.textContent = target.item.label;
+            const meta = document.createElement('span');
+            meta.className = 'block text-xs text-muted';
+            meta.textContent = `${target.character} · ${target.location}`;
             const need = document.createElement('span');
-            need.className = 'mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-extrabold text-amber-700';
-            need.append(document.createTextNode('Missing '));
-            appendResourceAmounts(need, missing, { onlyPositive: true, tone: 'text-amber-700' });
+            need.className = 'mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-semibold text-[#8a4210]';
+            need.append(document.createTextNode('Needs'));
+            appendResourceAmounts(need, missing, { onlyPositive: true });
             card.append(title, meta, need);
             list.appendChild(card);
         });
@@ -1042,12 +1023,18 @@ if (catalog && root) {
 
     const refreshKraftPlanner = (resources) => {
         const targets = allOwnedUpgradeableItems();
-        const target = refreshKraftTargetOptions(targets);
-        const strategy = value(document.querySelector('[data-kraft-strategy]')) || 'least_waste';
-        const plan = target ? findKraftPlan(target, resources, strategy) : null;
+        const select = document.querySelector('[data-kraft-target]');
 
-        renderKraftSummary(target, resources, plan || { missing: resourceBag(), resources: resourceBag(), waste: resourceBag(), cards: [] });
-        renderKraftSuggestion(target, plan || { cards: [] });
+        if (select) {
+            const current = select.value;
+            select.replaceChildren(new Option(targets.length ? 'Choose an owned upgradeable item' : 'No upgradeable items owned', ''));
+            targets.forEach((target) => select.add(new Option(`${target.item.label} · ${target.character}, ${target.location}`, target.key)));
+            select.value = targets.some((target) => target.key === current) ? current : '';
+        }
+
+        const { target, plan } = currentKraftPlan();
+        renderKraftSummary(target, resources, plan);
+        renderKraftSuggestion(target, plan);
         renderAlmostCraftable(targets, resources);
     };
 
@@ -1061,56 +1048,55 @@ if (catalog && root) {
             }
         });
 
-        const upgrades = [];
-        all('[data-character]').forEach((card) => {
-            const hero = heroById[value(card.querySelector('[data-hero-select]'))];
-            ownedItems(card).forEach((owned) => {
-                const item = itemByIndex[owned.index];
-                if (! owned.rekup && item?.can_upgrade && canAfford(item, resources)) {
-                    upgrades.push({
-                        character: hero?.name || `Character ${card.dataset.character}`,
-                        location: owned.location,
-                        item,
-                    });
-                }
-            });
-        });
-
-        const list = document.querySelector('[data-upgrades-list]');
+        const upgrades = allOwnedUpgradeableItems().filter((owned) => canAfford(owned.item, resources));
         const count = document.querySelector('[data-upgrades-count]');
         if (count) {
             count.textContent = upgrades.length;
         }
 
+        const list = document.querySelector('[data-upgrades-list]');
         if (list) {
             list.replaceChildren();
 
             if (! upgrades.length) {
-                const empty = document.createElement('p');
-                empty.className = 'text-slate-500';
-                empty.textContent = 'No items can be upgraded with the current pooled resources.';
-                list.appendChild(empty);
+                list.append(emptyNote('Nothing can be krafted from the current pool.'));
             }
 
             upgrades.forEach((upgrade) => {
-                const row = document.createElement('div');
-                row.className = 'grid min-h-10 items-center gap-1 border-t border-slate-200 py-2 first:border-t-0 md:grid-cols-[1fr_1.3fr_auto] md:gap-3';
-
-                const title = document.createElement('strong');
-                title.textContent = upgrade.item.index;
-                const location = document.createElement('span');
-                location.className = 'text-slate-500';
-                location.textContent = `${upgrade.character} · ${upgrade.location}`;
-                const cost = document.createElement('small');
-                cost.className = 'flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-500';
-                appendResourceAmounts(cost, upgrade.item.kraft);
-
-                row.append(title, location, cost);
+                const row = document.createElement('button');
+                row.type = 'button';
+                row.className = 'grid w-full gap-1 border-t border-line px-1 py-2 text-left first:border-t-0 hover:bg-paper-deep sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-3';
+                row.dataset.kraftPick = upgrade.key;
+                row.title = 'Plan this kraft';
+                const title = document.createElement('span');
+                title.className = 'min-w-0';
+                const name = document.createElement('strong');
+                name.className = 'block text-sm font-semibold';
+                name.textContent = upgrade.item.label;
+                const where = document.createElement('span');
+                where.className = 'block text-xs text-muted';
+                where.textContent = `${upgrade.character} · ${upgrade.location}`;
+                title.append(name, where);
+                const cost = document.createElement('span');
+                cost.className = 'flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-ink-soft';
+                appendResourceAmounts(cost, upgrade.item.kraft, { onlyPositive: true, emptyText: 'Free' });
+                row.append(title, cost);
                 list.appendChild(row);
             });
         }
 
         refreshKraftPlanner(resources);
+    };
+
+    const pickKraftTarget = (key) => {
+        const select = document.querySelector('[data-kraft-target]');
+        if (! select) {
+            return;
+        }
+
+        select.value = key;
+        refreshResourcesAndUpgrades();
+        select.closest('.panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
     const refreshCampaignCount = () => {
@@ -1119,7 +1105,13 @@ if (catalog && root) {
         if (campaignCount) {
             campaignCount.textContent = completed;
         }
+
+        all('[data-campaign-group]').forEach((group) => {
+            group.querySelector('[data-campaign-group-count]').textContent = all('input[type="checkbox"]:checked', group).length;
+        });
     };
+
+    // ---- Tooltips --------------------------------------------------------------------------------------
 
     const refreshItemTooltips = () => {
         all('select[data-filter="item"]').forEach((select) => {
@@ -1131,46 +1123,26 @@ if (catalog && root) {
             }
 
             const lines = [
-                item.index,
-                `Weight: ${item.weight}`,
-                `Hands required: ${item.hands}`,
-                '',
-                'Breaks down to:',
-                `Wood: ${item.rekup.wood}`,
-                `Metal: ${item.rekup.metal}`,
-                `Leather: ${item.rekup.leather}`,
-                `Gold: ${item.rekup.gold}`,
-                '',
-                'Upgradeability:',
+                item.label,
+                item.level ? `Level ${item.level} of 3` : 'No kraft levels',
+                `Weight: ${item.weight} · Hands: ${item.hands}`,
+                `Rekup: ${resourceNames.map((resource) => `${item.rekup[resource]} ${resource}`).join(', ')}`,
             ];
 
-            if (! item.can_upgrade) {
-                select.title = [
-                    ...lines,
-                    'No upgrade is possible for this item.',
-                ].join('\n');
-                return;
+            if (item.can_upgrade) {
+                lines.push(`Kraft: ${resourceNames.map((resource) => `${item.kraft[resource]} ${resource}`).join(', ')}`);
             }
 
-            select.title = [
-                ...lines,
-                'Can be upgraded.',
-                'Resources required to upgrade:',
-                `Wood: ${item.kraft.wood}`,
-                `Metal: ${item.kraft.metal}`,
-                `Leather: ${item.kraft.leather}`,
-                `Gold: ${item.kraft.gold}`,
-            ].join('\n');
+            if (item.notes) {
+                lines.push('', item.notes);
+            }
+
+            select.title = lines.join('\n');
         });
     };
 
     const refreshEnchantTooltips = () => {
         all('select[data-filter="enchant"]').forEach((select) => {
-            if (! select.value) {
-                select.removeAttribute('title');
-                return;
-            }
-
             const options = select.dataset.enchantSide === 'right' ? rightEnchants : leftEnchants;
             const enchant = options.find((option) => option.value === select.value);
 
@@ -1179,25 +1151,13 @@ if (catalog && root) {
                 return;
             }
 
-            if (select.dataset.enchantSide === 'right') {
-                select.title = [
-                    select.value,
-                    'Right enchant effect:',
-                    enchant.effect || 'No effect listed.',
-                ].join('\n');
-                return;
-            }
-
-            select.title = [
-                select.value,
-                'Upgrade condition:',
-                enchant.condition || 'No condition listed.',
-                '',
-                'Left enchant effect:',
-                enchant.effect || 'No effect listed.',
-            ].join('\n');
+            select.title = select.dataset.enchantSide === 'right'
+                ? [select.value, 'Enhanced effect:', enchant.effect || 'No effect listed.'].join('\n')
+                : [select.value, 'Effect:', enchant.effect || 'No effect listed.', '', 'Enhance objective:', enchant.condition || 'No condition listed.'].join('\n');
         });
     };
+
+    // ---- Auto-save -------------------------------------------------------------------------------------
 
     let autoSaveTimer = null;
     let autoSaveController = null;
@@ -1207,14 +1167,29 @@ if (catalog && root) {
         autoSaveTimer = null;
         autoSaveController?.abort();
         autoSaveController = new AbortController();
-        setSaveStatus('Saving...', 'pending');
+        setSaveStatus('Saving…', 'pending');
+
+        const body = new FormData(root);
+        const context = historyContext;
+        historyContext = {};
+
+        if (context.source) {
+            body.append('history_source', context.source);
+        }
+
+        if (context.kraft) {
+            body.append('history_kraft', context.kraft.text);
+            body.append('history_kraft_slot', context.kraft.slot);
+            context.kraft.consumed.forEach((index) => body.append('history_consumed[]', index));
+        }
 
         try {
             const response = await fetch(root.action, {
-                method: root.method || 'POST',
-                body: new FormData(root),
+                method: 'POST',
+                body,
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
+                    Accept: 'application/json',
                 },
                 signal: autoSaveController.signal,
             });
@@ -1223,115 +1198,79 @@ if (catalog && root) {
                 throw new Error(`Save failed with status ${response.status}`);
             }
 
+            const result = await response.json();
+            historyView.add(result.events || []);
             setSaveStatus(`Saved ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`, 'saved');
         } catch (error) {
             if (error.name === 'AbortError') {
+                // A newer save superseded this one; keep its history context for that save.
+                historyContext = { ...context, ...historyContext };
                 return;
             }
 
-            setSaveStatus('Auto-save failed. Use Save Tracker.', 'error');
+            historyContext = { ...context, ...historyContext };
+            setSaveStatus('Auto-save failed. Use Save.', 'error');
         } finally {
             autoSaveController = null;
         }
     };
 
     const scheduleAutoSave = () => {
-        setSaveStatus('Unsaved changes...', 'pending');
+        setSaveStatus('Unsaved changes…', 'pending');
         window.clearTimeout(autoSaveTimer);
         autoSaveTimer = window.setTimeout(saveNow, 900);
     };
 
-    const clearableSelects = () => all('select[data-filter], select[data-skill-tier]');
+    // ---- Clear buttons ---------------------------------------------------------------------------------
 
     const prepareClearButtons = () => {
-        clearableSelects().forEach((select) => {
+        all('select[data-filter], select[data-skill-tier]').forEach((select) => {
             if (select.dataset.clearReady === 'true') {
                 return;
             }
 
             select.dataset.clearReady = 'true';
 
+            const wrapper = document.createElement('div');
+            wrapper.className = 'select-wrap relative';
+            select.replaceWith(wrapper);
+
             const button = document.createElement('button');
             button.type = 'button';
-            button.className = 'grid h-7 w-7 shrink-0 place-items-center rounded-full border border-slate-300 bg-slate-50 text-sm font-black leading-none text-slate-500 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40';
-            button.textContent = 'x';
+            button.className = 'absolute right-7 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-muted hover:bg-danger/10 hover:text-danger';
             button.dataset.clearSelect = 'true';
-            button.title = 'Clear this selection';
+            button.title = 'Clear';
+            button.setAttribute('aria-label', 'Clear this selection');
+            button.innerHTML = '<svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
 
-            const parent = select.parentElement;
-
-            if (parent?.classList.contains('flex')) {
-                select.insertAdjacentElement('afterend', button);
-                return;
-            }
-
-            const wrapper = document.createElement('div');
-            wrapper.className = 'flex items-center gap-2';
-            select.replaceWith(wrapper);
             wrapper.append(select, button);
         });
     };
 
     const refreshClearButtons = () => {
         all('[data-clear-select]').forEach((button) => {
-            const select = button.previousElementSibling?.matches('select') ? button.previousElementSibling : null;
-
-            if (! select) {
-                button.classList.add('hidden');
-                return;
-            }
-
-            button.classList.toggle('hidden', ! select.value);
-            button.disabled = select.disabled;
+            const select = button.previousElementSibling;
+            button.classList.toggle('hidden', ! select?.value || select.disabled);
         });
     };
 
-    const prepareItemDragSources = () => {
-        all('select[data-filter="item"]').forEach((select) => {
-            if (select.dataset.dragReady === 'true') {
-                return;
-            }
-
-            select.dataset.dragReady = 'true';
-            select.classList.add('cursor-grab', 'active:cursor-grabbing');
-        });
-    };
-
-    const dragTargetSelect = (target) => {
-        const directSelect = selectFromElement(target);
-        if (directSelect?.matches('select[data-filter="item"]')) {
-            return directSelect;
-        }
-
-        return target.closest?.('label, .flex')?.querySelector('select[data-filter="item"]') || null;
-    };
-
-    const setDragHighlight = (target, enabled) => {
-        const select = dragTargetSelect(target);
-        if (! select) {
-            return;
-        }
-
-        select.classList.toggle('ring-2', enabled);
-        select.classList.toggle('ring-emerald-700', enabled);
-        select.classList.toggle('border-emerald-700', enabled);
-    };
-
-    const isInventorySelect = (select) => select?.name.includes('[inventory]');
-
-    const rekupCheckboxFor = (select) => select?.closest('[data-inventory-row]')?.querySelector('[data-rekup]') || null;
-
-    const isRekupInventoryItem = (select) => Boolean(isInventorySelect(select) && rekupCheckboxFor(select)?.checked);
+    // ---- Inventory locks -------------------------------------------------------------------------------
 
     const refreshAlwaysRekupLocks = () => {
         all('select[name*="[inventory]"][data-filter="item"]').forEach((select) => {
             const rekup = rekupCheckboxFor(select);
+            const row = select.closest('[data-inventory-row]');
+            const empty = ! select.value;
+            const locked = itemAlwaysRekup(select.value);
+
+            if (row) {
+                row.dataset.empty = empty ? 'true' : 'false';
+            }
+
             if (! rekup) {
                 return;
             }
 
-            const empty = ! select.value;
-            const locked = itemAlwaysRekup(select.value);
             if (locked) {
                 rekup.checked = true;
             } else if (empty) {
@@ -1340,13 +1279,8 @@ if (catalog && root) {
 
             const disabled = empty || locked || rekup.dataset.lockedByHero === 'true';
             rekup.disabled = disabled;
-            rekup.title = locked ? 'This item is always used as rekup.' : '';
-
-            const fieldShell = rekup.closest('label, [data-inventory-row]');
-            if (fieldShell) {
-                fieldShell.classList.toggle('opacity-50', disabled);
-                fieldShell.classList.toggle('grayscale', disabled);
-            }
+            rekup.closest('label').title = locked ? 'This card is always used as rekup.' : 'Break this card down into resources';
+            setFieldMuted(rekup, disabled && ! locked);
         });
     };
 
@@ -1369,27 +1303,21 @@ if (catalog && root) {
 
                 const disabled = lockedByHero || emptyInventory || mirrored || alwaysRekupInventory;
                 enchant.disabled = disabled;
-                enchant.classList.toggle('opacity-50', disabled);
-                enchant.classList.toggle('cursor-not-allowed', disabled);
-
-                const shell = enchant.closest('label');
-                shell?.classList.toggle('opacity-50', disabled);
-                shell?.classList.toggle('grayscale', disabled);
+                setFieldMuted(enchant, disabled);
             });
         });
     };
 
-    const clearEmptyInventoryRekup = () => {
-        all('select[name*="[inventory]"][data-filter="item"]').forEach((select) => {
-            if (select.value) {
-                return;
-            }
+    // ---- Drag and drop (mouse on the item field, touch/pen on the grip handles) ------------------------
 
-            const rekup = rekupCheckboxFor(select);
-            if (rekup) {
-                rekup.checked = false;
-            }
-        });
+    const slotItemSelect = (element) => element?.closest?.('[data-slot]')?.querySelector('select[data-filter="item"]') || null;
+
+    const dragSourceSelect = (target) => {
+        if (target.matches?.('select[data-filter="item"]')) {
+            return target;
+        }
+
+        return target.closest?.('[data-drag-handle]') ? slotItemSelect(target) : null;
     };
 
     const canDropItem = (source, destination) => {
@@ -1405,32 +1333,29 @@ if (catalog && root) {
             return false;
         }
 
-        if (! isInventorySelect(source) && isRekupInventoryItem(destination)) {
-            return false;
-        }
-
-        return true;
+        return ! (! isInventorySelect(source) && isRekupInventoryItem(destination));
     };
 
     let pointerDrag = null;
     let suppressNextClick = false;
 
-    const clearDragHighlights = () => {
-        all('select[data-filter="item"]').forEach((select) => setDragHighlight(select, false));
+    const setDropTarget = (select) => {
+        all('[data-slot][data-drop-target]').forEach((slot) => slot.removeAttribute('data-drop-target'));
+        select?.closest('[data-slot]')?.setAttribute('data-drop-target', 'true');
     };
 
     const createDragGhost = (select) => {
         const ghost = document.createElement('div');
-        ghost.className = 'pointer-events-none fixed z-50 max-w-80 rounded-md border border-emerald-800 bg-white px-3 py-2 text-sm font-extrabold text-emerald-950 shadow-xl';
-        ghost.textContent = select.value;
+        ghost.className = 'pointer-events-none fixed z-50 max-w-72 truncate rounded-md border border-orc-600 bg-paper px-3 py-2 text-sm font-semibold text-orc shadow-xl';
+        ghost.textContent = itemLabel(select.value);
         document.body.appendChild(ghost);
 
         return ghost;
     };
 
     const moveGhost = (ghost, x, y) => {
-        ghost.style.left = `${x + 12}px`;
-        ghost.style.top = `${y + 12}px`;
+        ghost.style.left = `${x + 14}px`;
+        ghost.style.top = `${y + 14}px`;
     };
 
     const closeOpenDropdown = () => {
@@ -1452,8 +1377,15 @@ if (catalog && root) {
         refresh();
     };
 
+    const endDrag = () => {
+        pointerDrag?.source.closest('[data-slot]')?.classList.remove('opacity-50');
+        pointerDrag?.ghost?.remove();
+        setDropTarget(null);
+        pointerDrag = null;
+    };
+
     root.addEventListener('pointerdown', (event) => {
-        const select = dragTargetSelect(event.target);
+        const select = dragSourceSelect(event.target);
 
         if (! select || ! select.value || event.button !== 0) {
             return;
@@ -1474,9 +1406,7 @@ if (catalog && root) {
             return;
         }
 
-        const distance = Math.hypot(event.clientX - pointerDrag.startX, event.clientY - pointerDrag.startY);
-
-        if (! pointerDrag.active && distance < 14) {
+        if (! pointerDrag.active && Math.hypot(event.clientX - pointerDrag.startX, event.clientY - pointerDrag.startY) < 12) {
             return;
         }
 
@@ -1485,20 +1415,15 @@ if (catalog && root) {
             suppressNextClick = true;
             closeOpenDropdown();
             pointerDrag.ghost = createDragGhost(pointerDrag.source);
-            pointerDrag.source.classList.add('opacity-60');
+            pointerDrag.source.closest('[data-slot]')?.classList.add('opacity-50');
         }
 
         event.preventDefault();
         moveGhost(pointerDrag.ghost, event.clientX, event.clientY);
-        clearDragHighlights();
 
-        const destination = dragTargetSelect(document.elementFromPoint(event.clientX, event.clientY));
-        if (canDropItem(pointerDrag.source, destination)) {
-            pointerDrag.target = destination;
-            setDragHighlight(destination, true);
-        } else {
-            pointerDrag.target = null;
-        }
+        const destination = slotItemSelect(document.elementFromPoint(event.clientX, event.clientY));
+        pointerDrag.target = canDropItem(pointerDrag.source, destination) ? destination : null;
+        setDropTarget(pointerDrag.target);
     }, { passive: false });
 
     window.addEventListener('pointerup', () => {
@@ -1507,114 +1432,135 @@ if (catalog && root) {
         }
 
         const wasDragging = pointerDrag.active;
+        const { source, target } = pointerDrag;
+        endDrag();
 
-        if (wasDragging && canDropItem(pointerDrag.source, pointerDrag.target)) {
-            swapItemSelects(pointerDrag.source, pointerDrag.target);
+        if (wasDragging && canDropItem(source, target)) {
+            swapItemSelects(source, target);
         }
 
-        pointerDrag.source.classList.remove('opacity-60');
-        pointerDrag.ghost?.remove();
         if (wasDragging) {
             closeOpenDropdown();
             window.setTimeout(() => {
                 suppressNextClick = false;
             }, 250);
         }
-        clearDragHighlights();
-        pointerDrag = null;
     });
-
-    document.addEventListener('click', (event) => {
-        const modalOpen = event.target.closest?.('[data-modal-open]');
-        if (modalOpen) {
-            openModal(modalOpen.dataset.modalOpen);
-            return;
-        }
-
-        const tabButton = event.target.closest?.('[data-tab]');
-        if (tabButton) {
-            showTab(tabButton.dataset.tab);
-            return;
-        }
-
-        if (event.target.closest?.('[data-undo]')) {
-            undoTracker();
-            return;
-        }
-
-        if (event.target.closest?.('[data-redo]')) {
-            redoTracker();
-            return;
-        }
-
-        if (event.target.closest?.('[data-consume-kraft-cards]')) {
-            consumeKraftPaymentCards();
-            return;
-        }
-
-        const clearButton = event.target.closest?.('[data-clear-select]');
-        if (clearButton) {
-            const select = clearButton.previousElementSibling?.matches('select') ? clearButton.previousElementSibling : null;
-            if (select && ! select.disabled) {
-                select.value = '';
-                if (isInventorySelect(select)) {
-                    rekupCheckboxFor(select).checked = false;
-                }
-                select.dispatchEvent(new Event('change', { bubbles: true }));
-                refresh();
-            }
-            return;
-        }
-
-        if (! suppressNextClick) {
-            return;
-        }
-
-        event.preventDefault();
-        event.stopPropagation();
-        suppressNextClick = false;
-    }, true);
 
     window.addEventListener('pointercancel', () => {
         if (! pointerDrag) {
             return;
         }
 
-        pointerDrag.source.classList.remove('opacity-60');
-        pointerDrag.ghost?.remove();
-        closeOpenDropdown();
+        endDrag();
         suppressNextClick = false;
-        clearDragHighlights();
-        pointerDrag = null;
     });
 
+    // ---- Clicks ----------------------------------------------------------------------------------------
+
     document.addEventListener('click', (event) => {
-        const closeButton = event.target.closest?.('[data-modal-close]');
-        if (closeButton) {
-            closeModal(closeButton.closest('[data-modal]'));
+        const target = event.target;
+
+        if (suppressNextClick) {
+            event.preventDefault();
+            event.stopPropagation();
+            suppressNextClick = false;
             return;
         }
 
-        const modal = event.target.matches?.('[data-modal]') ? event.target : null;
-        if (modal) {
-            closeModal(modal);
+        const openMenu = document.querySelector('details[data-menu][open]');
+        if (openMenu && ! openMenu.contains(target)) {
+            openMenu.removeAttribute('open');
         }
-    });
+
+        const modalOpen = target.closest?.('[data-modal-open]');
+        if (modalOpen) {
+            openModal(modalOpen.dataset.modalOpen);
+            return;
+        }
+
+        if (target.closest?.('[data-modal-close]')) {
+            closeModal(target.closest('[data-modal]'));
+            return;
+        }
+
+        if (target.matches?.('[data-modal]')) {
+            closeModal(target);
+            return;
+        }
+
+        const tabButton = target.closest?.('[data-tab]');
+        if (tabButton) {
+            showTab(tabButton.dataset.tab);
+            return;
+        }
+
+        const characterTab = target.closest?.('[data-character-tab]');
+        if (characterTab) {
+            showCharacter(characterTab.dataset.characterTab);
+            return;
+        }
+
+        if (target.closest?.('[data-add-character]')) {
+            addCharacter();
+            return;
+        }
+
+        const removeButton = target.closest?.('[data-remove-character]');
+        if (removeButton) {
+            removeCharacter(removeButton.closest('[data-character]'));
+            return;
+        }
+
+        if (target.closest?.('[data-undo]')) {
+            undoTracker();
+            return;
+        }
+
+        if (target.closest?.('[data-redo]')) {
+            redoTracker();
+            return;
+        }
+
+        if (target.closest?.('[data-consume-kraft-cards]')) {
+            consumeKraftPaymentCards();
+            return;
+        }
+
+        const kraftPick = target.closest?.('[data-kraft-pick]');
+        if (kraftPick) {
+            pickKraftTarget(kraftPick.dataset.kraftPick);
+            return;
+        }
+
+        const clearButton = target.closest?.('[data-clear-select]');
+        if (clearButton) {
+            const select = clearButton.previousElementSibling;
+            if (select && ! select.disabled) {
+                select.value = '';
+                if (isInventorySelect(select)) {
+                    rekupCheckboxFor(select).checked = false;
+                }
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+    }, true);
 
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
             closeModal();
+            document.querySelector('details[data-menu][open]')?.removeAttribute('open');
         }
     });
 
+    // ---- Refresh cycle ---------------------------------------------------------------------------------
+
     const refresh = () => {
         prepareClearButtons();
-        prepareItemDragSources();
         refreshSkills();
         applyHandRules();
         refreshFilteredSelects();
         refreshHeroPanels();
-        clearEmptyInventoryRekup();
         refreshAlwaysRekupLocks();
         refreshItemEnchantLocks();
         refreshResourcesAndUpgrades();
@@ -1622,6 +1568,7 @@ if (catalog && root) {
         refreshItemTooltips();
         refreshEnchantTooltips();
         refreshClearButtons();
+        refreshCharacterTabs();
     };
 
     root.addEventListener('change', (event) => {
@@ -1636,6 +1583,8 @@ if (catalog && root) {
     root.addEventListener('input', (event) => {
         if (event.target.matches('select, input[type="checkbox"]')) {
             refresh();
+        } else if (event.target.matches('[data-player-input]')) {
+            refreshHeroPanels();
         }
 
         if (event.target.name && event.target.matches('input, textarea, select')) {
@@ -1647,10 +1596,9 @@ if (catalog && root) {
     root.addEventListener('submit', () => {
         window.clearTimeout(autoSaveTimer);
         autoSaveController?.abort();
-        setSaveStatus('Saving...', 'pending');
+        setSaveStatus('Saving…', 'pending');
     });
 
     refresh();
     commitHistory();
 }
-//

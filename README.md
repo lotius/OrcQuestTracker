@@ -78,21 +78,27 @@ Run tests:
 
 ```bash
 php artisan test
+npm test
 ```
+
+`npm test` checks the kraft planner against an exhaustive search over thousands of random card hands.
 
 ## Main Tabs
 
-The tracker is split into three tabs:
+The tracker is split into four tabs:
 
 - `Characters`: party sheets, heroes, skills, equipment, inventory, and rekup flags.
-- `Resources & Upgrades`: rekup pool totals, eligible upgrades, and the kraft planner.
+- `Kraft & Rekup`: rekup pool totals, upgrades you can afford, and the kraft planner.
 - `Campaign`: campaign name, quest checklist, and notes.
+- `History`: a searchable log of everything that has happened in the campaign.
 
-The active tab is remembered in the browser.
+The layout is responsive: on phones the tabs move to a bottom bar, inventory slots stack onto two lines, and drag handles work with touch. The active tab and character are remembered in the browser.
+
+The visual style follows the OrcQuest WarPath rule book: parchment pages, Metal Mania headings, orc-green panels and the spiked skull emblem.
 
 ## Characters
 
-The Characters tab supports up to six character slots.
+The Characters tab supports up to six characters. New campaigns start with four; use `Add orc` to bring in more and the trash icon to remove one (this clears their sheet; Undo brings them back). A row of portrait chips switches between characters, and `Party` shows everyone at once (handy for dragging items between orcs).
 
 Each character tracks:
 
@@ -104,7 +110,11 @@ Each character tracks:
 - 15 inventory slots
 - rekup status for inventory items
 
-Hero-specific skill choices update automatically when a hero is selected.
+Hero-specific skill choices update automatically when a hero is selected. Each skill tier shows the cards learned plus one empty slot.
+
+## Item Levels
+
+Item names show their kraft level as stars, e.g. `BB 019 - Axe ★`. Levels are worked out from the catalog: kraft chains share an item name, cards that cannot be upgraded are level 3, the lowest-coded upgradeable card (and copies with the same kraft plan) is level 1, and the rest are level 2. Potions, resources, gold and relics have no level.
 
 ## Inventory And Equipment
 
@@ -144,7 +154,7 @@ Some cards are automatically locked into Rekup status because they are not meani
 
 These cards appear with the Rekup checkbox already checked and disabled. Their enchant slots are also cleared and disabled because automatic-Rekup cards are not usable gear. Empty inventory slots also keep the Rekup checkbox disabled until an item is selected.
 
-Inventory items can be dragged between inventory slots and equipment slots. When items are moved, their rekup state is preserved where appropriate. Always-rekup items stay checked and locked even after being moved.
+Inventory items can be dragged between inventory slots and equipment slots, either by the item field (mouse) or by the grip handle beside each slot (mouse, touch or pen). When items are moved, their rekup state is preserved where appropriate. Always-rekup items stay checked and locked even after being moved.
 
 Two-handed item handling is automatic:
 
@@ -211,9 +221,11 @@ The planner shows:
 
 The `Missing now` row turns red when the target cannot be paid from the current rekup pool.
 
+Click an item under `Ready to Kraft` or `Almost Kraftable` to load it into the planner.
+
 ## Kraft Strategies
 
-Strategies decide which exact cards should be consumed.
+Strategies decide which exact cards should be consumed. Every strategy first prefers cards already in the rekup pool; cards still carried as gear are only used when the pool cannot pay, and are flagged `Carried`.
 
 `Least amount of wasted resources`
 
@@ -239,16 +251,10 @@ The `?` button beside Strategy opens a modal explaining these options.
 
 ## Consuming Payment Cards
 
-After the kraft planner suggests payment cards, click:
-
-```text
-Consume Payment Cards
-```
-
-This will:
+After the kraft planner suggests payment cards, click `Kraft it`. This will:
 
 - remove the suggested payment cards from their inventory slots
-- leave the target upgrade item in place
+- swap the target for a free card of the next level of the same item, keeping its enchants (if no such card is free, only the payment is made)
 - compact each character's inventory so remaining items move into the earliest slots
 - refresh resources and upgrade availability
 - auto-save the result
@@ -272,18 +278,19 @@ The Campaign tab tracks quest progress by quest book:
 
 The Campaign tab also includes freeform notes for campaign memory.
 
+## History
+
+Every save is compared with the previous one and the differences are logged as readable entries: characters joining or leaving, hero and player changes, skills learned, items added, removed, moved or traded between orcs, rekup flags, enchants, upgrades, kraft payments, quests and notes. Changes made through Undo or Redo are tagged as such, and rapid typing in a text field is folded into a single entry.
+
+The History tab groups entries by day and can be searched or filtered by type and character. History is stored with each campaign; `Save as new campaign` carries it over and `Reset campaign` keeps it, adding a reset entry.
+
 ## Campaign Management
 
-The header includes campaign controls:
+The header includes `Save`, Undo and Redo. The `⋮` menu holds:
 
-- campaign selector
-- `Load`
-- `Reset`
-- `Save Tracker`
-
-The bottom of the form includes:
-
-- `Save As New Campaign`
+- campaign selector and `Load`
+- `Save as new campaign`
+- `Reset campaign` (asks for confirmation)
 
 Campaigns are stored locally in Laravel storage as JSON.
 
@@ -299,7 +306,7 @@ The header shows current save status:
 - `Saved [time]`
 - failure message if save fails
 
-The manual `Save Tracker` button remains available as a safety fallback.
+The manual `Save` button remains available as a safety fallback.
 
 ## Undo And Redo
 

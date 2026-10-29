@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Services\OrcQuestCatalog;
 use App\Services\TrackerCalculator;
+use App\Services\TrackerHistory;
 use App\Services\TrackerStore;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Arr;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,6 +18,7 @@ class TrackerController extends Controller
         private OrcQuestCatalog $catalog,
         private TrackerCalculator $calculator,
         private TrackerStore $store,
+        private TrackerHistory $history,
     ) {
     }
 
@@ -42,13 +45,15 @@ class TrackerController extends Controller
             'summaries' => collect($state['characters'])->map(fn (array $character) => $this->calculator->characterSummary($character)),
             'resources' => $this->calculator->resources($state),
             'eligibleUpgrades' => $this->calculator->eligibleUpgrades($state),
+            'history' => array_slice($this->store->history($activeCampaignId), -2000),
         ]);
     }
 
-    public function update(Request $request): RedirectResponse
+    public function update(Request $request): RedirectResponse|JsonResponse
     {
         $validated = $request->validate([
             'characters' => ['array'],
+            'characters.*.active' => ['nullable', 'boolean'],
             'characters.*.player' => ['nullable', 'string', 'max:80'],
             'characters.*.hero_id' => ['nullable', 'string'],
             'characters.*.skills' => ['array'],
@@ -67,6 +72,11 @@ class TrackerController extends Controller
             'campaign_id' => ['nullable', 'string'],
             'campaign_name' => ['nullable', 'string', 'max:120'],
             'intent' => ['nullable', 'string'],
+            'history_source' => ['nullable', 'in:undo,redo'],
+            'history_kraft' => ['nullable', 'string', 'max:2000'],
+            'history_kraft_slot' => ['nullable', 'string'],
+            'history_consumed' => ['array'],
+            'history_consumed.*' => ['string'],
         ]);
 
         $state = $this->store->defaults();
@@ -74,6 +84,7 @@ class TrackerController extends Controller
 
         foreach ($state['characters'] as $slot => $character) {
             $incoming = $incomingCharacters[$slot] ?? [];
+            $state['characters'][$slot]['active'] = (bool) ($incoming['active'] ?? false);
             $state['characters'][$slot]['player'] = $incoming['player'] ?? '';
             $state['characters'][$slot]['hero_id'] = $incoming['hero_id'] ?? '';
             $state['characters'][$slot]['skills'] = [
@@ -105,9 +116,26 @@ class TrackerController extends Controller
         $state['notes'] = $validated['notes'] ?? '';
 
         $campaignName = $validated['campaign_name'] ?? $this->store->activeCampaignName();
-        $campaignId = ($validated['intent'] ?? '') === 'save_as'
-            ? $this->store->saveAs($state, $campaignName)
-            : $this->store->save($validated['campaign_id'] ?? $this->store->activeCampaignId(), $state, $campaignName);
+        $campaignId = $validated['campaign_id'] ?? $this->store->activeCampaignId();
+        $events = $this->history->diff($this->store->load($campaignId), $state, [
+            'source' => $validated['history_source'] ?? null,
+            'kraft' => [
+                'text' => $validated['history_kraft'] ?? null,
+                'slot' => $validated['history_kraft_slot'] ?? null,
+                'consumed' => $validated['history_consumed'] ?? [],
+            ],
+        ]);
+
+        if (($validated['intent'] ?? '') === 'save_as') {
+            $campaignId = $this->store->saveAs($state, $campaignName, $campaignId, $events);
+            $stored = [];
+        } else {
+            [$campaignId, $stored] = $this->store->save($campaignId, $state, $campaignName, $events);
+        }
+
+        if ($request->ajax()) {
+            return response()->json(['campaign_id' => $campaignId, 'events' => $stored]);
+        }
 
         return redirect()
             ->route('tracker.index', ['campaign_id' => $campaignId])
