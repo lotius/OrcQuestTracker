@@ -9,10 +9,13 @@ class OrcQuestCatalog
 {
     private array $data;
 
+    private array $itemsByIndex;
+
     public function __construct()
     {
         $this->data = json_decode(file_get_contents(resource_path('data/orcquest.json')), true);
         $this->data['items'] = $this->withLevels($this->data['items']);
+        $this->itemsByIndex = array_column($this->data['items'], null, 'index');
     }
 
     /**
@@ -84,7 +87,7 @@ class OrcQuestCatalog
 
     public function item(?string $index): ?array
     {
-        return $index ? $this->items()->firstWhere('index', $index) : null;
+        return $index ? ($this->itemsByIndex[$index] ?? null) : null;
     }
 
     public function itemByCode(?string $code): ?array

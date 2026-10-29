@@ -1,17 +1,8 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#173a22">
-    <title>OrcQuest Upgrade Tracker</title>
-    <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
-    <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
-    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
-    <link rel="manifest" href="{{ asset('site.webmanifest') }}">
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-</head>
-<body class="font-sans text-ink antialiased">
+@extends('layouts.base')
+
+@section('title', $campaign->name.' · OrcQuest Tracker')
+
+@section('body')
     @php
         $resourceNames = ['wood', 'metal', 'leather', 'gold'];
         $resourceIcons = collect($resourceNames)->mapWithKeys(fn ($resource) => [$resource => asset("images/icons/{$resource}-resource.png")]);
@@ -22,6 +13,7 @@
             ['item' => 'armor_item', 'left' => 'armor_left_enchant', 'right' => 'armor_right_enchant', 'label' => 'Armor'],
             ['item' => 'artifact_item', 'left' => 'artifact_left_enchant', 'right' => 'artifact_right_enchant', 'label' => 'Artifact'],
         ];
+        $itemLabels = $items->pluck('label', 'index');
         $activeSlots = collect($state['characters'])->filter(fn ($character) => $character['active'] ?? false)->keys();
         $firstActiveSlot = $activeSlots->first();
     @endphp
@@ -29,12 +21,31 @@
     {{-- Header ----------------------------------------------------------------------------------- --}}
     <header class="torn-bottom sticky top-0 z-40 bg-orc text-white shadow-[0_2px_10px_rgba(0,0,0,.25)]">
         <div class="mx-auto flex h-14 max-w-[1600px] items-center gap-2 px-3 sm:gap-3 sm:px-4 lg:px-6">
-            <img class="size-9 shrink-0 drop-shadow" src="{{ asset('favicon.svg') }}" alt="">
-            <div class="min-w-0 leading-none">
-                <p class="hidden text-[10px] font-semibold uppercase tracking-[0.2em] text-sage sm:block">OrcQuest WarPath</p>
-                <h1 class="font-display truncate text-xl sm:text-2xl">Upgrade Tracker</h1>
-                <p class="mt-0.5 truncate text-[11px] text-white/60 sm:hidden" data-save-status-secondary>Auto-save ready</p>
-            </div>
+            <a class="shrink-0" href="{{ route('campaigns.index') }}" title="All campaigns"><img class="size-9 drop-shadow" src="{{ asset('favicon.svg') }}" alt="All campaigns"></a>
+            <details class="relative min-w-0" data-menu>
+                <summary class="flex min-w-0 cursor-pointer list-none items-center gap-1 rounded-md py-1 pl-1 pr-1.5 hover:bg-white/10 [&::-webkit-details-marker]:hidden" title="Switch campaign">
+                    <span class="min-w-0 leading-none">
+                        <span class="hidden text-[10px] font-semibold uppercase tracking-[0.2em] text-sage sm:block">OrcQuest campaign</span>
+                        <span class="font-display block max-w-[42vw] truncate text-xl sm:max-w-[16rem] sm:text-2xl lg:max-w-[22rem]" data-campaign-title>{{ $campaign->name }}</span>
+                        <span class="mt-0.5 block truncate text-[11px] text-white/60 sm:hidden" data-save-status-secondary>All changes saved</span>
+                    </span>
+                    <x-icon name="chevron" class="size-4 shrink-0 text-white/70" />
+                </summary>
+                <div class="panel absolute left-0 top-full z-50 mt-2 grid w-[min(20rem,calc(100vw-1.5rem))] gap-0.5 p-2 text-ink">
+                    <p class="field-label px-2 pt-1">Switch campaign</p>
+                    <div class="grid max-h-[50vh] gap-0.5 overflow-y-auto">
+                        @foreach ($campaigns as $other)
+                            <a class="flex items-center justify-between gap-2 rounded-md px-2 py-2 text-sm hover:bg-paper-deep aria-[current=page]:bg-sage-soft aria-[current=page]:font-semibold aria-[current=page]:text-orc" href="{{ route('campaigns.show', $other) }}" @if ($other->id === $campaign->id) aria-current="page" @endif>
+                                <span class="truncate">{{ $other->name }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+                    <div class="mt-1 grid gap-0.5 border-t border-line pt-1.5">
+                        <a class="flex items-center gap-2 rounded-md px-2 py-2 text-sm font-semibold text-orc-700 hover:bg-sage-soft" href="{{ route('campaigns.index') }}#new-campaign"><x-icon name="plus" class="size-4" /> New campaign</a>
+                        <a class="flex items-center gap-2 rounded-md px-2 py-2 text-sm text-ink-soft hover:bg-paper-deep" href="{{ route('campaigns.index') }}"><x-icon name="map" class="size-4" /> Manage campaigns</a>
+                    </div>
+                </div>
+            </details>
 
             <nav class="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-black/30 bg-orc pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_14px_rgba(0,0,0,.2)] md:static md:ml-4 md:flex md:gap-1 md:border-0 md:bg-transparent md:pb-0 md:shadow-none" data-tabs aria-label="Sections">
                 @foreach (['characters' => ['users', 'Characters'], 'resources' => ['hammer', 'Kraft & Rekup'], 'campaign' => ['map', 'Campaign'], 'history' => ['scroll', 'History']] as $tab => [$icon, $tabLabel])
@@ -46,38 +57,27 @@
             </nav>
 
             <div class="ml-auto flex items-center gap-1 sm:gap-1.5">
-                <span class="mr-1 hidden text-xs font-medium text-white/60 sm:inline" data-save-status>Auto-save ready</span>
+                <span class="mr-1 hidden text-xs font-medium text-white/60 sm:inline" data-save-status>All changes saved</span>
                 <button class="icon-btn text-white hover:bg-white/10" type="button" data-undo disabled title="Undo" aria-label="Undo"><x-icon name="undo" /></button>
                 <button class="icon-btn text-white hover:bg-white/10" type="button" data-redo disabled title="Redo" aria-label="Redo"><x-icon name="redo" /></button>
-                <button class="btn btn-bone px-2.5 sm:px-3.5" type="submit" form="tracker-form" name="intent" value="save" title="Save tracker">
+                <button class="btn btn-bone px-2.5 sm:px-3.5" type="button" data-save-now title="Save now">
                     <x-icon name="save" class="size-4" /><span class="hidden sm:inline">Save</span>
                 </button>
                 <details class="relative" data-menu>
-                    <summary class="icon-btn cursor-pointer list-none text-white hover:bg-white/10 [&::-webkit-details-marker]:hidden" aria-label="Campaign menu" title="Campaign menu"><x-icon name="more" /></summary>
-                    <div class="panel absolute right-0 top-full z-50 mt-2 grid w-[min(20rem,calc(100vw-1.5rem))] gap-3 p-3 text-ink">
-                        <form method="get" action="{{ route('tracker.index') }}">
-                            <label class="field-label" for="campaign-picker">Campaign</label>
-                            <div class="flex gap-2">
-                                <select class="control" id="campaign-picker" name="campaign_id" onchange="this.form.submit()">
-                                    @foreach ($campaigns as $campaign)
-                                        <option value="{{ $campaign['id'] }}" @selected($activeCampaignId === $campaign['id'])>{{ $campaign['name'] }}</option>
-                                    @endforeach
-                                </select>
-                                <button class="btn btn-outline" type="submit">Load</button>
-                            </div>
+                    <summary class="icon-btn cursor-pointer list-none text-white hover:bg-white/10 [&::-webkit-details-marker]:hidden" aria-label="More" title="More"><x-icon name="more" /></summary>
+                    <div class="panel absolute right-0 top-full z-50 mt-2 grid w-[min(16rem,calc(100vw-1.5rem))] gap-0.5 p-2 text-ink">
+                        <form method="post" action="{{ route('campaigns.duplicate', $campaign) }}">
+                            @csrf
+                            <button class="btn w-full justify-start text-ink-soft hover:bg-paper-deep" type="submit"><x-icon name="copy" class="size-4" /> Duplicate campaign</button>
                         </form>
-                        <div class="grid gap-1 border-t border-line pt-2">
-                            <button class="btn justify-start text-ink-soft hover:bg-paper-deep" type="submit" form="tracker-form" name="intent" value="save_as">
-                                <x-icon name="copy" class="size-4" /> Save as new campaign
-                            </button>
-                            <form method="post" action="{{ route('tracker.reset') }}" onsubmit="return confirm('Reset this campaign? All characters, quests and notes will be cleared.')">
-                                @csrf
-                                <input type="hidden" name="campaign_id" value="{{ $activeCampaignId }}">
-                                <button class="btn w-full justify-start text-danger hover:bg-danger/10" type="submit">
-                                    <x-icon name="refresh" class="size-4" /> Reset campaign
-                                </button>
-                            </form>
-                        </div>
+                        <a class="btn justify-start text-ink-soft hover:bg-paper-deep" href="{{ route('campaigns.export', $campaign) }}"><x-icon name="save" class="size-4" /> Export to file</a>
+                        <a class="btn justify-start text-ink-soft hover:bg-paper-deep" href="{{ route('campaigns.index') }}"><x-icon name="map" class="size-4" /> All campaigns</a>
+                        <div class="my-1 border-t border-line"></div>
+                        <a class="btn justify-start text-ink-soft hover:bg-paper-deep" href="{{ route('account') }}"><x-icon name="users" class="size-4" /> Account</a>
+                        <form method="post" action="{{ route('logout') }}">
+                            @csrf
+                            <button class="btn w-full justify-start text-ink-soft hover:bg-paper-deep" type="submit"><x-icon name="x" class="size-4" /> Sign out</button>
+                        </form>
                     </div>
                 </details>
             </div>
@@ -89,9 +89,8 @@
     @endif
 
     <main class="mx-auto max-w-[1600px] px-3 pb-28 pt-4 sm:px-4 md:pb-12 lg:px-6">
-        <form id="tracker-form" method="post" action="{{ route('tracker.update') }}" data-tracker-root>
+        <form id="tracker-form" method="post" action="{{ route('campaigns.save', $campaign) }}" data-tracker-root data-version="{{ $campaign->version }}" data-campaigns-url="{{ route('campaigns.index') }}">
             @csrf
-            <input type="hidden" name="campaign_id" value="{{ $activeCampaignId }}">
 
             {{-- Characters ------------------------------------------------------------------------ --}}
             <section data-tab-panel="characters">
@@ -216,27 +215,27 @@
                                                                 <span class="field-label">Left enchant</span>
                                                                 <select class="control" name="characters[{{ $slot }}][equipment][{{ $equip['left'] }}]" data-filter="enchant" data-enchant-side="left" data-needs-hero @disabled(! $selectedHero)>
                                                                     <option value="">None</option>
-                                                                    @foreach ($leftEnchants as $option)
-                                                                        <option value="{{ $option['value'] }}" @selected(($character['equipment'][$equip['left']] ?? '') === $option['value'])>{{ $option['label'] }}</option>
-                                                                    @endforeach
+                                                                    @if ($current = ($character['equipment'][$equip['left']] ?? ''))
+                                                                        <option value="{{ $current }}" selected>{{ $current }}</option>
+                                                                    @endif
                                                                 </select>
                                                             </label>
                                                             <label class="eq-item">
                                                                 <span class="field-label">Item</span>
                                                                 <select class="control font-medium" name="characters[{{ $slot }}][equipment][{{ $equip['item'] }}]" data-filter="item" data-location="{{ $equip['label'] }}" data-needs-hero @disabled(! $selectedHero)>
                                                                     <option value="">None</option>
-                                                                    @foreach ($items as $item)
-                                                                        <option value="{{ $item['index'] }}" @selected(($character['equipment'][$equip['item']] ?? '') === $item['index'])>{{ $item['label'] }}</option>
-                                                                    @endforeach
+                                                                    @if ($current = ($character['equipment'][$equip['item']] ?? ''))
+                                                                        <option value="{{ $current }}" selected>{{ $itemLabels[$current] ?? $current }}</option>
+                                                                    @endif
                                                                 </select>
                                                             </label>
                                                             <label class="eq-right">
                                                                 <span class="field-label">Right enchant</span>
                                                                 <select class="control" name="characters[{{ $slot }}][equipment][{{ $equip['right'] }}]" data-filter="enchant" data-enchant-side="right" data-needs-hero @disabled(! $selectedHero)>
                                                                     <option value="">None</option>
-                                                                    @foreach ($rightEnchants as $option)
-                                                                        <option value="{{ $option['value'] }}" @selected(($character['equipment'][$equip['right']] ?? '') === $option['value'])>{{ $option['label'] }}</option>
-                                                                    @endforeach
+                                                                    @if ($current = ($character['equipment'][$equip['right']] ?? ''))
+                                                                        <option value="{{ $current }}" selected>{{ $current }}</option>
+                                                                    @endif
                                                                 </select>
                                                             </label>
                                                         </div>
@@ -303,27 +302,27 @@
                                                             <span class="sr-only">Left enchant</span>
                                                             <select class="control" name="characters[{{ $slot }}][inventory][{{ $index }}][left_enchant]" data-filter="enchant" data-enchant-side="left" data-needs-hero @disabled(! $selectedHero || $row['item'] === '')>
                                                                 <option value="">Left enchant</option>
-                                                                @foreach ($leftEnchants as $option)
-                                                                    <option value="{{ $option['value'] }}" @selected(($row['left_enchant'] ?? '') === $option['value'])>{{ $option['label'] }}</option>
-                                                                @endforeach
+                                                                @if ($current = ($row['left_enchant'] ?? ''))
+                                                                    <option value="{{ $current }}" selected>{{ $current }}</option>
+                                                                @endif
                                                             </select>
                                                         </label>
                                                         <label class="inv-item">
                                                             <span class="sr-only">Item</span>
                                                             <select class="control font-medium" name="characters[{{ $slot }}][inventory][{{ $index }}][item]" data-filter="item" data-location="Inventory {{ $index + 1 }}" data-needs-hero @disabled(! $selectedHero)>
                                                                 <option value="">Empty</option>
-                                                                @foreach ($items as $item)
-                                                                    <option value="{{ $item['index'] }}" @selected($row['item'] === $item['index'])>{{ $item['label'] }}</option>
-                                                                @endforeach
+                                                                @if ($current = $row['item'])
+                                                                    <option value="{{ $current }}" selected>{{ $itemLabels[$current] ?? $current }}</option>
+                                                                @endif
                                                             </select>
                                                         </label>
                                                         <label class="inv-right">
                                                             <span class="sr-only">Right enchant</span>
                                                             <select class="control" name="characters[{{ $slot }}][inventory][{{ $index }}][right_enchant]" data-filter="enchant" data-enchant-side="right" data-needs-hero @disabled(! $selectedHero || $row['item'] === '')>
                                                                 <option value="">Right enchant</option>
-                                                                @foreach ($rightEnchants as $option)
-                                                                    <option value="{{ $option['value'] }}" @selected(($row['right_enchant'] ?? '') === $option['value'])>{{ $option['label'] }}</option>
-                                                                @endforeach
+                                                                @if ($current = ($row['right_enchant'] ?? ''))
+                                                                    <option value="{{ $current }}" selected>{{ $current }}</option>
+                                                                @endif
                                                             </select>
                                                         </label>
                                                         <label class="inv-rekup h-10 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-line bg-white px-2 text-xs font-semibold text-muted has-checked:border-ember has-checked:bg-ember/10 has-checked:text-[#8a4210] sm:h-9" title="Break this card down into resources">
@@ -374,7 +373,7 @@
                     <div class="panel p-3 sm:p-4">
                         <div class="mb-1 flex items-baseline justify-between gap-2">
                             <h3 class="section-title">Ready to Kraft</h3>
-                            <span class="text-xs text-muted"><span class="font-semibold text-ink" data-upgrades-count>{{ $eligibleUpgrades->count() }}</span> affordable now</span>
+                            <span class="text-xs text-muted"><span class="font-semibold text-ink" data-upgrades-count>0</span> affordable now</span>
                         </div>
                         <div class="max-h-[22rem] overflow-auto" data-upgrades-list></div>
                     </div>
@@ -428,7 +427,7 @@
                     <div class="mb-3 grid items-end gap-3 sm:grid-cols-[minmax(0,26rem)_1fr]">
                         <label>
                             <span class="field-label">Campaign name</span>
-                            <input class="control" name="campaign_name" value="{{ $activeCampaignName }}">
+                            <input class="control" name="campaign_name" value="{{ $campaign->name }}" maxlength="120" required data-campaign-name>
                         </label>
                         <p class="text-sm text-muted sm:text-right"><span class="text-2xl font-bold tabular-nums text-orc-700" data-campaign-count>{{ collect($state['campaign'])->filter()->count() }}</span> quests completed</p>
                     </div>
@@ -496,6 +495,7 @@
                 <div data-history-list></div>
             </div>
         </section>
+        @include('partials.fan-notice')
     </main>
 
     <div class="fixed inset-0 z-50 hidden overflow-y-auto bg-ink/60 p-4" data-modal="strategy-help" role="dialog" aria-modal="true" aria-labelledby="strategy-help-title">
@@ -534,5 +534,4 @@
             'rightEnchants' => $rightEnchants->values(),
         ]) }};
     </script>
-</body>
-</html>
+@endsection

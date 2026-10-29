@@ -1,6 +1,25 @@
 import { findKraftPlan, resourceBag, resourceNames, subtractBags } from './kraft.js';
 import { createHistoryView } from './history.js';
 
+// Dropdown menus (<details data-menu>) on every page: close on outside click or Escape.
+document.addEventListener('click', (event) => {
+    document.querySelectorAll('details[data-menu][open]').forEach((menu) => {
+        if (! menu.contains(event.target)) {
+            menu.removeAttribute('open');
+        }
+    });
+});
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+        document.querySelectorAll('details[data-menu][open]').forEach((menu) => menu.removeAttribute('open'));
+    }
+});
+
+if (window.location.hash === '#new-campaign') {
+    document.querySelector('#new-campaign input[name="name"]')?.focus();
+}
+
 const catalog = window.orcQuestCatalog;
 const root = document.querySelector('[data-tracker-root]');
 
@@ -262,7 +281,7 @@ if (catalog && root) {
                 return;
             }
 
-            control.value = entry.value;
+            assign(control, entry.value);
         });
 
         historyState.restoring = false;
@@ -360,14 +379,14 @@ if (catalog && root) {
         const rekup = rekupCheckboxFor(select);
         const canHaveEnchants = item && ! itemAlwaysRekup(item);
 
-        select.value = item;
+        assign(select, item);
 
         if (enchants.left) {
-            enchants.left.value = canHaveEnchants ? (bundle?.leftEnchant || '') : '';
+            assign(enchants.left, canHaveEnchants ? bundle?.leftEnchant : '');
         }
 
         if (enchants.right) {
-            enchants.right.value = canHaveEnchants ? (bundle?.rightEnchant || '') : '';
+            assign(enchants.right, canHaveEnchants ? bundle?.rightEnchant : '');
         }
 
         if (rekup) {
@@ -469,7 +488,7 @@ if (catalog && root) {
                     moveItemToInventory(card, itemBundleForSelect(second));
                 }
 
-                second.value = first.value;
+                assign(second, first.value);
                 clearItemEnchantFields(second);
                 setSecondHandMirror(second, true);
             } else {
@@ -485,72 +504,85 @@ if (catalog && root) {
         applyingHandRules = false;
     };
 
-    // ---- Option filtering (each card / hero / enchant can only be in one place) ------------------------
+    // ---- Option lists (each card / hero / enchant can only be in one place) ----------------------------
+    //
+    // Item and enchant selects are rendered with only their current value; the full list (~250 cards) is
+    // filled in when a select is opened. That keeps the page small, and availability is only computed for
+    // the one list being looked at.
 
-    // The page holds ~34k options, so availability is updated incrementally: only options whose key
-    // changed hands since the last refresh (plus each select's own old/new value) are touched.
-    const optionIndexes = new WeakMap();
-    const filterGroups = {
-        hero: { selector: 'select[data-filter="hero"]', keyOf: (optionValue) => optionValue, counts: null },
-        item: { selector: 'select[data-filter="item"]', keyOf: (optionValue) => optionValue, counts: null },
-        enchant: { selector: 'select[data-filter="enchant"]', keyOf: enchantCode, counts: null },
-    };
+    const optionTemplates = {};
 
-    const optionIndex = (select, keyOf) => {
-        let index = optionIndexes.get(select);
-
-        if (! index) {
-            index = new Map();
-            Array.from(select.options).forEach((option) => option.value && index.set(keyOf(option.value), option));
-            optionIndexes.set(select, index);
+    const optionSource = (select) => {
+        if (select.dataset.filter === 'item') {
+            return 'item';
         }
 
-        return index;
+        return select.dataset.filter === 'enchant' ? select.dataset.enchantSide : null;
     };
 
-    const refreshFilterGroup = (group) => {
-        const selects = all(group.selector);
-        const ownKeys = selects.map((select) => (select.value ? group.keyOf(select.value) : ''));
-        const counts = new Map();
-        ownKeys.forEach((key) => key && counts.set(key, (counts.get(key) || 0) + 1));
-
-        const changed = new Set();
-        if (group.counts) {
-            counts.forEach((count, key) => group.counts.get(key) !== count && changed.add(key));
-            group.counts.forEach((_, key) => ! counts.has(key) && changed.add(key));
+    const optionTemplate = (source) => {
+        if (! optionTemplates[source]) {
+            const fragment = document.createDocumentFragment();
+            const entries = source === 'item'
+                ? items.map((item) => [item.index, item.label])
+                : (source === 'right' ? rightEnchants : leftEnchants).map((option) => [option.value, option.label]);
+            entries.forEach(([optionValue, label]) => fragment.append(new Option(label, optionValue)));
+            optionTemplates[source] = fragment;
         }
 
-        selects.forEach((select, position) => {
-            const own = ownKeys[position];
-            const index = optionIndex(select, group.keyOf);
-            const keys = group.counts && select.dataset.ownKey !== undefined
-                ? new Set([...changed, own, select.dataset.ownKey])
-                : index.keys();
+        return optionTemplates[source];
+    };
 
-            for (const key of keys) {
-                const option = key && index.get(key);
-                if (! option) {
-                    continue;
-                }
+    const optionLabel = (select, optionValue) => (select.dataset.filter === 'item' ? itemLabel(optionValue) : optionValue);
 
-                // Never disable a select's own current option: browsers drop disabled selected options from
-                // form submissions, which would erase the item (e.g. a two-handed weapon held in both hands).
-                const unavailable = own !== key && counts.has(key);
-                if (option.disabled !== unavailable) {
-                    option.disabled = unavailable;
-                    option.hidden = unavailable;
-                }
+    /** Sets a select's value, adding the option first if a lazily filled list does not have it yet. */
+    const assign = (control, nextValue) => {
+        nextValue = nextValue || '';
+
+        if (nextValue && control.tagName === 'SELECT' && ! Array.from(control.options).some((option) => option.value === nextValue)) {
+            control.add(new Option(optionLabel(control, nextValue), nextValue));
+        }
+
+        control.value = nextValue;
+    };
+
+    const filterKey = (select) => (select.dataset.filter === 'enchant' ? enchantCode : (optionValue) => optionValue);
+
+    /** Fills a select's full list (once) and hides options already used elsewhere (every time it opens). */
+    const prepareOptions = (select) => {
+        if (! select?.matches?.('select[data-filter]')) {
+            return;
+        }
+
+        const source = optionSource(select);
+        if (source && select.dataset.filled !== 'true') {
+            const current = select.value;
+            const placeholder = select.options[0]?.value === '' ? select.options[0] : new Option('None', '');
+            select.replaceChildren(placeholder, optionTemplate(source).cloneNode(true));
+            select.value = current;
+            select.dataset.filled = 'true';
+        }
+
+        const keyOf = filterKey(select);
+        const own = select.value ? keyOf(select.value) : '';
+        const used = new Set(all(`select[data-filter="${select.dataset.filter}"]`)
+            .filter((other) => other !== select && other.value)
+            .map((other) => keyOf(other.value)));
+
+        Array.from(select.options).forEach((option) => {
+            // Never disable the select's own current option: browsers drop disabled selected options from
+            // form submissions, which would erase the item.
+            const unavailable = Boolean(option.value) && keyOf(option.value) !== own && used.has(keyOf(option.value));
+            if (option.disabled !== unavailable) {
+                option.disabled = unavailable;
+                option.hidden = unavailable;
             }
-
-            select.dataset.ownKey = own;
         });
-
-        group.counts = counts;
     };
 
-    const refreshFilteredSelects = () => {
-        Object.values(filterGroups).forEach(refreshFilterGroup);
-    };
+    root.addEventListener('pointerdown', (event) => prepareOptions(event.target), true);
+    root.addEventListener('focusin', (event) => prepareOptions(event.target));
+    root.addEventListener('keydown', (event) => prepareOptions(event.target), true);
 
     // ---- Skills: hero-specific options; show filled slots plus one empty slot per tier -----------------
 
@@ -895,7 +927,7 @@ if (catalog && root) {
 
         // Enchanted stuff keeps its enchants when krafted, so only the item card changes.
         if (next) {
-            target.select.value = next.index;
+            assign(target.select, next.index);
         }
 
         compactInventories();
@@ -1225,18 +1257,55 @@ if (catalog && root) {
     // ---- Auto-save -------------------------------------------------------------------------------------
 
     let autoSaveTimer = null;
-    let autoSaveController = null;
+    let saving = null;
+    let saveAgain = false;
+    let campaignVersion = Number(root.dataset.version || 1);
+    let saveBlocked = null;
 
+    const hasUnsavedWork = () => Boolean(autoSaveTimer || saving);
+
+    const blockSaving = (reason, message, action) => {
+        saveBlocked = reason;
+        window.clearTimeout(autoSaveTimer);
+        autoSaveTimer = null;
+        setSaveStatus(reason === 'conflict' ? 'Not saved: changed elsewhere' : 'Not saved: signed out', 'error');
+
+        document.querySelector('[data-save-banner]')?.remove();
+        const banner = document.createElement('div');
+        banner.dataset.saveBanner = 'true';
+        banner.className = 'fixed inset-x-3 top-[4.5rem] z-50 mx-auto flex max-w-xl flex-col gap-2 rounded-lg bg-blood px-4 py-3 text-sm text-white shadow-2xl sm:flex-row sm:items-center';
+        banner.setAttribute('role', 'alert');
+        const text = document.createElement('p');
+        text.className = 'flex-1';
+        text.textContent = message;
+        const button = document.createElement('a');
+        button.className = 'btn btn-bone shrink-0';
+        button.href = action.href;
+        button.textContent = action.label;
+        banner.append(text, button);
+        document.body.appendChild(banner);
+    };
+
+    /** Saves are queued, never cancelled: a cancelled request may still land, which would desync versions. */
     const saveNow = async () => {
         window.clearTimeout(autoSaveTimer);
         autoSaveTimer = null;
-        autoSaveController?.abort();
-        autoSaveController = new AbortController();
+
+        if (saveBlocked) {
+            return;
+        }
+
+        if (saving) {
+            saveAgain = true;
+            return saving;
+        }
+
         setSaveStatus('Saving…', 'pending');
 
         const body = new FormData(root);
         const context = historyContext;
         historyContext = {};
+        body.append('version', String(campaignVersion));
 
         if (context.source) {
             body.append('history_source', context.source);
@@ -1248,43 +1317,91 @@ if (catalog && root) {
             context.kraft.consumed.forEach((index) => body.append('history_consumed[]', index));
         }
 
-        try {
-            const response = await fetch(root.action, {
-                method: 'POST',
-                body,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    Accept: 'application/json',
-                },
-                signal: autoSaveController.signal,
-            });
+        saving = (async () => {
+            try {
+                const response = await fetch(root.action, {
+                    method: 'POST',
+                    body,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+                    credentials: 'same-origin',
+                });
 
-            if (! response.ok) {
-                throw new Error(`Save failed with status ${response.status}`);
-            }
+                if (response.status === 409) {
+                    blockSaving('conflict', 'This campaign was changed in another tab or on another device since you opened it, so your latest change was not saved. Reload to get the current version.', { href: window.location.href, label: 'Reload campaign' });
+                    return;
+                }
 
-            const result = await response.json();
-            historyView.add(result.events || []);
-            setSaveStatus(`Saved ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`, 'saved');
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                // A newer save superseded this one; keep its history context for that save.
+                if (response.status === 401 || response.status === 419) {
+                    blockSaving('auth', 'Your session has ended, so your latest change was not saved. Sign in again, then redo it.', { href: '/login', label: 'Sign in' });
+                    return;
+                }
+
+                if (! response.ok) {
+                    throw new Error(`Save failed with status ${response.status}`);
+                }
+
+                const result = await response.json();
+                campaignVersion = result.version;
+                historyView.add(result.events || []);
+                setSaveStatus(`Saved ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`, 'saved');
+            } catch {
                 historyContext = { ...context, ...historyContext };
-                return;
+                setSaveStatus('Save failed, retrying…', 'error');
+                window.clearTimeout(autoSaveTimer);
+                autoSaveTimer = window.setTimeout(saveNow, 5000);
             }
+        })();
 
-            historyContext = { ...context, ...historyContext };
-            setSaveStatus('Auto-save failed. Use Save.', 'error');
-        } finally {
-            autoSaveController = null;
+        await saving;
+        saving = null;
+
+        if (saveAgain) {
+            saveAgain = false;
+            await saveNow();
         }
     };
 
     const scheduleAutoSave = () => {
+        if (saveBlocked) {
+            return;
+        }
+
         setSaveStatus('Unsaved changes…', 'pending');
         window.clearTimeout(autoSaveTimer);
         autoSaveTimer = window.setTimeout(saveNow, 900);
     };
+
+    // Finish saving before following a link (campaign switcher, account, ...); warn if the tab is closed mid-save.
+    document.addEventListener('click', async (event) => {
+        const link = event.target.closest?.('a[href]');
+        if (! link || link.target || event.defaultPrevented || event.metaKey || event.ctrlKey || ! hasUnsavedWork() || saveBlocked) {
+            return;
+        }
+
+        event.preventDefault();
+        await saveNow();
+        window.location.href = link.href;
+    });
+
+    document.addEventListener('submit', async (event) => {
+        if (event.target === root) {
+            event.preventDefault();
+            saveNow();
+            return;
+        }
+
+        if (hasUnsavedWork() && ! saveBlocked) {
+            event.preventDefault();
+            await saveNow();
+            event.target.submit();
+        }
+    });
+
+    window.addEventListener('beforeunload', (event) => {
+        if (hasUnsavedWork() && ! saveBlocked) {
+            event.preventDefault();
+        }
+    });
 
     // ---- Clear buttons ---------------------------------------------------------------------------------
 
@@ -1702,11 +1819,6 @@ if (catalog && root) {
             return;
         }
 
-        const openMenu = document.querySelector('details[data-menu][open]');
-        if (openMenu && ! openMenu.contains(target)) {
-            openMenu.removeAttribute('open');
-        }
-
         const modalOpen = target.closest?.('[data-modal-open]');
         if (modalOpen) {
             openModal(modalOpen.dataset.modalOpen);
@@ -1764,6 +1876,11 @@ if (catalog && root) {
             return;
         }
 
+        if (target.closest?.('[data-save-now]')) {
+            saveNow();
+            return;
+        }
+
         if (target.closest?.('[data-undo]')) {
             undoTracker();
             return;
@@ -1801,7 +1918,6 @@ if (catalog && root) {
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
             closeModal();
-            document.querySelector('details[data-menu][open]')?.removeAttribute('open');
         }
     });
 
@@ -1811,7 +1927,6 @@ if (catalog && root) {
         prepareClearButtons();
         refreshSkills();
         applyHandRules();
-        refreshFilteredSelects();
         refreshHeroPanels();
         refreshAlwaysRekupLocks();
         refreshItemEnchantLocks();
@@ -1842,6 +1957,8 @@ if (catalog && root) {
         // Selects and checkboxes also fire "change", which refreshes; refreshing here too doubled the work.
         if (event.target.matches('[data-player-input]')) {
             refreshHeroPanels();
+        } else if (event.target.matches('[data-campaign-name]')) {
+            document.querySelector('[data-campaign-title]').textContent = event.target.value.trim() || 'Untitled Campaign';
         }
 
         if (event.target.name && event.target.matches('input, textarea, select')) {
@@ -1850,11 +1967,6 @@ if (catalog && root) {
         }
     });
 
-    root.addEventListener('submit', () => {
-        window.clearTimeout(autoSaveTimer);
-        autoSaveController?.abort();
-        setSaveStatus('Saving…', 'pending');
-    });
 
     refresh();
     commitHistory();

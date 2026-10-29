@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Services\OrcQuestCatalog;
 use App\Services\TrackerHistory;
-use App\Services\TrackerStore;
+use App\Services\CampaignState;
 use Tests\TestCase;
 
 class TrackerHistoryTest extends TestCase
@@ -18,7 +18,7 @@ class TrackerHistoryTest extends TestCase
         parent::setUp();
 
         $this->history = app(TrackerHistory::class);
-        $this->base = app(TrackerStore::class)->defaults();
+        $this->base = app(CampaignState::class)->defaults();
         $this->base['characters']['1']['hero_id'] = 'abgral';
     }
 
@@ -121,7 +121,7 @@ class TrackerHistoryTest extends TestCase
 
         $before['characters']['1']['active'] = true;
         $after = $before;
-        $after['characters']['1'] = app(TrackerStore::class)->defaults()['characters']['1'];
+        $after['characters']['1'] = app(CampaignState::class)->defaults()['characters']['1'];
         $after['characters']['1']['active'] = false;
         $this->assertSame(['Abgral left the warband'], $this->texts($before, $after));
 
