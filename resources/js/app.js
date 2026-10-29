@@ -628,6 +628,9 @@ if (catalog && root) {
 
     // ---- Skills: hero-specific options; show filled slots plus one empty slot per tier -----------------
 
+    const skillCode = (skill) => skill.match(/^\(([^)]+)\)/)?.[1] || '';
+    const skillName = (skill) => skill.replace(/^\([^)]*\)\s*/, '') || skill;
+
     const refreshSkills = () => {
         characterCards().forEach((card) => {
             const hero = heroById[value(card.querySelector('[data-hero-select]'))];
@@ -656,7 +659,7 @@ if (catalog && root) {
                             return;
                         }
 
-                        select.add(new Option(skill, skill, false, skill === current));
+                        select.add(new Option(skillName(skill), skill, false, skill === current));
                     });
 
                     select.value = current;
@@ -725,9 +728,9 @@ if (catalog && root) {
             : 'Empty');
     };
 
-    const heroFactPill = (text, color) => {
+    const heroFactPill = (text, color, extraClass = '') => {
         const pill = document.createElement('span');
-        pill.className = 'pill';
+        pill.className = `pill ${extraClass}`.trim();
 
         if (color) {
             const dot = document.createElement('span');
@@ -783,7 +786,7 @@ if (catalog && root) {
                     facts.append(
                         heroFactPill(hero.class),
                         heroFactPill(`${hero.base_health} ${hero.health_color} health`, healthColors[hero.health_color] || '#776e62'),
-                        heroFactPill(`Starts with ${hero.starting_stuff}`),
+                        heroFactPill(`Starts with ${hero.starting_stuff}`, null, 'hidden sm:inline-flex'),
                     );
                 }
             }
@@ -1528,6 +1531,10 @@ if (catalog && root) {
             return options.find((option) => option.value === optionValue)?.effect || null;
         }
 
+        if (select.dataset.skillTier) {
+            return skillCode(optionValue) || null;
+        }
+
         if (select.dataset.filter === 'hero') {
             const hero = heroById[optionValue];
             return hero ? `${hero.class} · ${hero.base_health} ${hero.health_color} health · starts with ${hero.starting_stuff}` : null;
@@ -1573,6 +1580,7 @@ if (catalog && root) {
 
             if (row) {
                 row.dataset.empty = empty ? 'true' : 'false';
+                row.dataset.locked = locked ? 'true' : 'false';
             }
 
             if (! rekup) {
@@ -1589,6 +1597,28 @@ if (catalog && root) {
             rekup.disabled = disabled;
             rekup.closest('label').title = locked ? 'This card is always used as rekup.' : 'Break this card down into resources';
             setFieldMuted(rekup, disabled && ! locked);
+        });
+    };
+
+    const refreshSpareSlots = () => {
+        all('[data-inventory-list]').forEach((list) => {
+            const rows = all('[data-inventory-row]', list);
+            let firstEmptySeen = false;
+            let spare = 0;
+
+            rows.forEach((row) => {
+                const isSpare = row.dataset.empty === 'true' && firstEmptySeen;
+                firstEmptySeen ||= row.dataset.empty === 'true';
+                row.dataset.spare = isSpare ? 'true' : 'false';
+                spare += isSpare ? 1 : 0;
+            });
+
+            const toggle = list.querySelector('[data-toggle-spare]');
+            if (toggle) {
+                const showing = list.hasAttribute('data-show-all');
+                toggle.hidden = spare === 0;
+                toggle.textContent = showing ? 'Hide extra empty slots' : `Show all ${rows.length} slots (${spare} more empty)`;
+            }
         });
     };
 
@@ -1964,6 +1994,13 @@ if (catalog && root) {
             return;
         }
 
+        const spareToggle = target.closest?.('[data-toggle-spare]');
+        if (spareToggle) {
+            spareToggle.closest('[data-inventory-list]').toggleAttribute('data-show-all');
+            refreshSpareSlots();
+            return;
+        }
+
         const pickerOpener = target.closest?.('[data-picker-open]');
         if (pickerOpener) {
             picker.open(pickerOpener.parentElement.querySelector('select'), pickerOpener);
@@ -2064,6 +2101,7 @@ if (catalog && root) {
         applyHandRules();
         refreshHeroPanels();
         refreshAlwaysRekupLocks();
+        refreshSpareSlots();
         refreshItemEnchantLocks();
         refreshResourcesIfVisible();
         refreshCampaignCount();

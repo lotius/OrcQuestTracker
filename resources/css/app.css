@@ -184,7 +184,7 @@
 
     /* Collapsible sections inside a character sheet */
     .tray > summary {
-        @apply flex cursor-pointer list-none items-center gap-3 rounded-t-lg px-3 py-2.5 select-none sm:px-4;
+        @apply flex cursor-pointer list-none items-center gap-3 rounded-t-lg px-2.5 py-2 select-none sm:px-4 sm:py-2.5;
     }
 
     .tray > summary::-webkit-details-marker {
@@ -224,6 +224,20 @@
         grid-template-areas: "num item item item";
     }
 
+    .inv-row[data-locked="true"] {
+        grid-template-areas: "num item item rekup";
+    }
+
+    .inv-row[data-locked="true"] > .inv-left,
+    .inv-row[data-locked="true"] > .inv-right {
+        display: none;
+    }
+
+    /* Narrow screens show the first empty slot only; "Show all slots" reveals the rest. */
+    [data-inventory-list]:not([data-show-all]) .inv-row[data-spare="true"] {
+        display: none;
+    }
+
     .inv-row[data-empty="true"] > .inv-left,
     .inv-row[data-empty="true"] > .inv-right,
     .inv-row[data-empty="true"] > .inv-rekup {
@@ -231,6 +245,10 @@
     }
 
     .inv-head {
+        display: none;
+    }
+
+    .equip-fields .field-label {
         display: none;
     }
 
@@ -252,6 +270,19 @@
         .inv-row[data-empty="true"] > .inv-rekup {
             display: flex;
         }
+
+        .inv-row[data-locked="true"] > .inv-left,
+        .inv-row[data-locked="true"] > .inv-right {
+            display: block;
+        }
+
+        [data-inventory-list] .inv-row[data-spare="true"] {
+            display: grid;
+        }
+
+        .inv-spare-toggle {
+            display: none;
+        }
     }
 
     /* Equipment slots: item first on narrow screens, enchant | item | enchant when wide */
@@ -269,6 +300,10 @@
     .equip-fields > .eq-right { grid-area: right; }
 
     @container equipment (min-width: 30rem) {
+        .equip-fields .field-label {
+            display: block;
+        }
+
         .equip-fields {
             grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, 1fr);
             grid-template-areas: "left item right";

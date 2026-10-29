@@ -49,7 +49,7 @@
 
             <nav class="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-black/30 bg-orc pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_14px_rgba(0,0,0,.2)] md:static md:ml-4 md:flex md:gap-1 md:border-0 md:bg-transparent md:pb-0 md:shadow-none" data-tabs aria-label="Sections">
                 @foreach (['characters' => ['users', 'Characters'], 'resources' => ['hammer', 'Kraft & Rekup'], 'campaign' => ['map', 'Campaign'], 'history' => ['scroll', 'History']] as $tab => [$icon, $tabLabel])
-                    <button class="flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold text-white/60 transition-colors hover:text-white aria-pressed:text-white aria-pressed:shadow-[inset_0_3px_0_var(--color-sage)] md:flex-row md:gap-2 md:rounded-md md:px-3 md:text-sm md:hover:bg-white/10 md:aria-pressed:bg-white/15 md:aria-pressed:shadow-none" type="button" data-tab="{{ $tab }}" aria-pressed="{{ $tab === 'characters' ? 'true' : 'false' }}">
+                    <button class="flex flex-col items-center gap-0.5 py-1.5 text-[11px] font-semibold text-white/60 transition-colors hover:text-white aria-pressed:text-white aria-pressed:shadow-[inset_0_3px_0_var(--color-sage)] md:flex-row md:gap-2 md:rounded-md md:px-3 md:text-sm md:hover:bg-white/10 md:aria-pressed:bg-white/15 md:aria-pressed:shadow-none" type="button" data-tab="{{ $tab }}" aria-pressed="{{ $tab === 'characters' ? 'true' : 'false' }}">
                         <x-icon :name="$icon" class="size-5 md:size-4" />
                         <span>{{ $tabLabel }}</span>
                     </button>
@@ -88,33 +88,33 @@
         <div class="toast fixed inset-x-0 top-[4.25rem] z-50 mx-auto w-max max-w-[90vw] rounded-full bg-orc-600 px-4 py-2 text-sm font-semibold text-white shadow-lg" role="status">{{ session('status') }}</div>
     @endif
 
-    <main class="mx-auto max-w-[1600px] px-3 pb-28 pt-4 sm:px-4 md:pb-12 lg:px-6">
+    <main class="mx-auto max-w-[1600px] px-2 pb-24 pt-3 sm:px-4 sm:pt-4 md:pb-12 lg:px-6">
         <form id="tracker-form" method="post" action="{{ route('campaigns.save', $campaign) }}" data-tracker-root data-version="{{ $campaign->version }}" data-campaigns-url="{{ route('campaigns.index') }}">
             @csrf
 
             {{-- Characters ------------------------------------------------------------------------ --}}
             <section data-tab-panel="characters">
-                <div class="z-30 -mx-3 mb-3 bg-parchment/95 px-3 pb-2 pt-1 md:sticky md:top-[3.5rem] md:pt-3 sm:-mx-4 sm:px-4 lg:-mx-6 lg:px-6">
+                <div class="z-30 -mx-2 mb-2 bg-parchment/95 px-2 pb-1 pt-0.5 sm:-mx-4 sm:mb-3 sm:px-4 sm:pb-2 md:sticky md:top-[3.5rem] md:pt-3 sm:-mx-4 sm:px-4 lg:-mx-6 lg:px-6">
                     <div class="flex flex-wrap items-center gap-1.5" data-character-tabs>
                         @foreach ($state['characters'] as $slot => $character)
                             @php $chipHero = $summaries[$slot]['hero']; @endphp
-                            <button class="flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-paper py-1 pl-1 pr-2.5 text-left sm:gap-2 sm:pr-3 text-ink shadow-sm transition-colors hover:border-orc-600 aria-pressed:border-orc aria-pressed:bg-orc aria-pressed:text-white" type="button" data-character-tab="{{ $slot }}" aria-pressed="{{ (string) $slot === (string) $firstActiveSlot ? 'true' : 'false' }}" @if (! ($character['active'] ?? false)) hidden @endif>
+                            <button class="group flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-paper p-0.5 text-left aria-pressed:pr-2.5 sm:gap-2 sm:py-1 sm:pl-1 sm:pr-3 text-ink shadow-sm transition-colors hover:border-orc-600 aria-pressed:border-orc aria-pressed:bg-orc aria-pressed:text-white" type="button" data-character-tab="{{ $slot }}" aria-pressed="{{ (string) $slot === (string) $firstActiveSlot ? 'true' : 'false' }}" @if (! ($character['active'] ?? false)) hidden @endif>
                                 <span class="relative">
                                     <img class="size-7 rounded-full sm:size-8 object-cover ring-1 ring-black/10" src="{{ $chipHero['icon'] ?? '' }}" alt="" data-chip-icon @if (! $chipHero) hidden @endif>
                                     <span class="portrait-fallback size-7 place-items-center rounded-full bg-paper-deep text-muted sm:size-8"><x-icon name="skull" class="size-4" /></span>
                                     <span class="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-danger ring-2 ring-paper" data-chip-alert title="Over a carrying limit" hidden></span>
                                 </span>
-                                <span class="min-w-0 leading-tight">
+                                <span class="hidden min-w-0 leading-tight group-aria-pressed:block sm:block">
                                     <span class="block max-w-[6.5rem] truncate text-sm font-semibold sm:max-w-[8.5rem]" data-chip-name>{{ $chipHero['name'] ?? 'Character '.$slot }}</span>
                                     <span class="hidden max-w-[8.5rem] truncate text-[11px] opacity-70 sm:block" data-chip-player>{{ $character['player'] ?: 'No player' }}</span>
                                 </span>
                             </button>
                         @endforeach
-                        <button class="flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-2 text-sm font-semibold text-ink-soft shadow-sm hover:border-orc-600 aria-pressed:border-orc aria-pressed:bg-orc aria-pressed:text-white" type="button" data-character-tab="all" aria-pressed="false" title="Show every character at once">
-                            <x-icon name="users" class="size-4" /> Party
+                        <button class="flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-paper p-2 text-sm font-semibold text-ink-soft shadow-sm hover:border-orc-600 aria-pressed:border-orc aria-pressed:bg-orc aria-pressed:text-white sm:px-3" type="button" data-character-tab="all" aria-pressed="false" title="Show every character at once" aria-label="Party: show every character">
+                            <x-icon name="users" class="size-4" /> <span class="hidden sm:inline">Party</span>
                         </button>
-                        <button class="flex shrink-0 items-center gap-1.5 rounded-full border border-dashed border-orc-600/60 px-3 py-2 text-sm font-semibold text-orc-700 hover:bg-sage-soft" type="button" data-add-character @if ($activeSlots->count() >= count($state['characters'])) hidden @endif>
-                            <x-icon name="plus" class="size-4" /> Add orc
+                        <button class="flex shrink-0 items-center gap-1.5 rounded-full border border-dashed border-orc-600/60 p-2 text-sm font-semibold text-orc-700 hover:bg-sage-soft sm:px-3" type="button" data-add-character title="Add an orc" aria-label="Add an orc" @if ($activeSlots->count() >= count($state['characters'])) hidden @endif>
+                            <x-icon name="plus" class="size-4" /> <span class="hidden sm:inline">Add orc</span>
                         </button>
                     </div>
                 </div>
@@ -135,23 +135,23 @@
                             <input type="hidden" name="characters[{{ $slot }}][active]" value="{{ ($character['active'] ?? false) ? 1 : 0 }}" data-character-active>
 
                             {{-- Identity strip --}}
-                            <div class="grid gap-3 border-b border-line bg-paper-deep/60 p-3 sm:p-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                            <div class="grid gap-2 border-b border-line bg-paper-deep/60 p-2.5 sm:gap-3 sm:p-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
                                 <div class="flex min-w-0 items-start gap-3">
-                                    <img class="size-16 shrink-0 rounded-lg border-2 border-orc object-cover shadow-sm sm:size-[4.5rem]" src="{{ $selectedHero['icon'] ?? '' }}" alt="{{ $selectedHero ? $selectedHero['name'].' portrait' : '' }}" data-hero-icon @if (! $selectedHero) hidden @endif>
-                                    <div class="portrait-fallback size-16 shrink-0 place-items-center rounded-lg border-2 border-dashed border-line-strong text-line-strong sm:size-[4.5rem]"><x-icon name="skull" class="size-8" /></div>
+                                    <img class="size-12 shrink-0 rounded-lg border-2 border-orc object-cover shadow-sm sm:size-[4.5rem]" src="{{ $selectedHero['icon'] ?? '' }}" alt="{{ $selectedHero ? $selectedHero['name'].' portrait' : '' }}" data-hero-icon @if (! $selectedHero) hidden @endif>
+                                    <div class="portrait-fallback size-12 shrink-0 place-items-center rounded-lg border-2 border-dashed border-line-strong text-line-strong sm:size-[4.5rem]"><x-icon name="skull" class="size-8" /></div>
                                     <div class="min-w-0 flex-1">
                                         <div class="flex items-start justify-between gap-2">
                                             <div class="min-w-0">
-                                                <p class="eyebrow">Character {{ $slot }}</p>
-                                                <h2 class="font-display truncate text-[1.7rem] leading-tight text-ink" data-hero-name>{{ $selectedHero['name'] ?? 'Unassigned Hero' }}</h2>
+                                                <p class="eyebrow hidden sm:block">Character {{ $slot }}</p>
+                                                <h2 class="font-display truncate text-2xl leading-tight text-ink sm:text-[1.7rem]" data-hero-name>{{ $selectedHero['name'] ?? 'Unassigned Hero' }}</h2>
                                             </div>
                                             <button class="icon-btn -mr-1 -mt-1 size-9 text-muted hover:bg-danger/10 hover:text-danger lg:hidden" type="button" data-remove-character title="Remove this character" aria-label="Remove this character"><x-icon name="trash" class="size-4" /></button>
                                         </div>
-                                        <div class="mt-1.5 flex flex-wrap gap-1.5" data-hero-facts @if (! $selectedHero) hidden @endif>
+                                        <div class="mt-1 flex flex-wrap gap-1 sm:mt-1.5 sm:gap-1.5" data-hero-facts @if (! $selectedHero) hidden @endif>
                                             @if ($selectedHero)
                                                 <span class="pill">{{ $selectedHero['class'] }}</span>
                                                 <span class="pill"><span class="size-2.5 rounded-full" style="background: {{ $healthColors[$selectedHero['health_color']] ?? '#776e62' }}"></span>{{ $selectedHero['base_health'] }} {{ $selectedHero['health_color'] }} health</span>
-                                                <span class="pill">Starts with {{ $selectedHero['starting_stuff'] }}</span>
+                                                <span class="pill hidden sm:inline-flex">Starts with {{ $selectedHero['starting_stuff'] }}</span>
                                             @endif
                                         </div>
                                     </div>
@@ -176,8 +176,8 @@
                                 </div>
                             </div>
 
-                            <div class="grid gap-3 p-3 sm:p-4">
-                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:max-w-2xl">
+                            <div class="grid gap-2 p-2 sm:gap-3 sm:p-4">
+                                <div class="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:max-w-2xl">
                                     <label>
                                         <span class="field-label">Player</span>
                                         <input class="control" name="characters[{{ $slot }}][player]" value="{{ $character['player'] }}" placeholder="Who's playing?" autocomplete="off" data-player-input>
@@ -193,8 +193,8 @@
                                     </label>
                                 </div>
 
-                                <div class="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-                                    <div class="grid gap-3">
+                                <div class="grid items-start gap-2 sm:gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+                                    <div class="grid gap-2 sm:gap-3">
                                         {{-- Equipment --}}
                                         <details class="tray rounded-lg border border-line bg-white/50" data-character-tray="equipment" open>
                                             <summary>
@@ -202,19 +202,19 @@
                                                 <span class="min-w-0 flex-1 truncate text-right text-xs text-muted" data-tray-summary="equipment"></span>
                                                 <x-icon name="chevron" class="chev size-4 text-muted" />
                                             </summary>
-                                            <div class="@container/equipment grid gap-2 border-t border-line p-2 sm:p-3">
+                                            <div class="@container/equipment grid gap-1.5 border-t border-line p-1.5 sm:gap-2 sm:p-3">
                                                 @foreach ($equipmentSlots as $equip)
-                                                    <div class="rounded-md border border-line bg-paper p-2" data-slot>
-                                                        <div class="mb-1.5 flex items-center gap-1">
+                                                    <div class="rounded-md border border-line bg-paper p-1.5 sm:p-2" data-slot>
+                                                        <div class="mb-1 flex items-center gap-1 sm:mb-1.5">
                                                             <button class="-ml-0.5 rounded p-0.5 text-line-strong hover:bg-paper-deep hover:text-muted" type="button" data-drag-handle data-move-item title="Tap to move, or drag" aria-label="Move this item"><x-icon name="grip" class="size-4" /></button>
-                                                            <span class="text-sm font-semibold text-ink-soft">{{ $equip['label'] }}</span>
-                                                            <button class="ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-orc-700 hover:bg-sage-soft" type="button" data-move-item data-needs-item><x-icon name="move" class="size-3.5" /> Move</button>
+                                                            <span class="text-xs font-semibold uppercase tracking-wide text-ink-soft sm:text-sm sm:normal-case sm:tracking-normal">{{ $equip['label'] }}</span>
+                                                            <button class="-my-1 ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-orc-700 hover:bg-sage-soft" type="button" data-move-item data-needs-item><x-icon name="move" class="size-3.5" /> Move</button>
                                                         </div>
                                                         <div class="equip-fields">
                                                             <label class="eq-left">
                                                                 <span class="field-label">Left enchant</span>
                                                                 <select class="control" name="characters[{{ $slot }}][equipment][{{ $equip['left'] }}]" data-filter="enchant" data-enchant-side="left" data-needs-hero @disabled(! $selectedHero)>
-                                                                    <option value="">None</option>
+                                                                    <option value="">Left enchant</option>
                                                                     @if ($current = ($character['equipment'][$equip['left']] ?? ''))
                                                                         <option value="{{ $current }}" selected>{{ $current }}</option>
                                                                     @endif
@@ -223,7 +223,7 @@
                                                             <label class="eq-item">
                                                                 <span class="field-label">Item</span>
                                                                 <select class="control font-medium" name="characters[{{ $slot }}][equipment][{{ $equip['item'] }}]" data-filter="item" data-location="{{ $equip['label'] }}" data-needs-hero @disabled(! $selectedHero)>
-                                                                    <option value="">None</option>
+                                                                    <option value="">No item</option>
                                                                     @if ($current = ($character['equipment'][$equip['item']] ?? ''))
                                                                         <option value="{{ $current }}" selected>{{ $itemLabels[$current] ?? $current }}</option>
                                                                     @endif
@@ -232,7 +232,7 @@
                                                             <label class="eq-right">
                                                                 <span class="field-label">Right enchant</span>
                                                                 <select class="control" name="characters[{{ $slot }}][equipment][{{ $equip['right'] }}]" data-filter="enchant" data-enchant-side="right" data-needs-hero @disabled(! $selectedHero)>
-                                                                    <option value="">None</option>
+                                                                    <option value="">Right enchant</option>
                                                                     @if ($current = ($character['equipment'][$equip['right']] ?? ''))
                                                                         <option value="{{ $current }}" selected>{{ $current }}</option>
                                                                     @endif
@@ -251,15 +251,15 @@
                                                 <span class="min-w-0 flex-1 truncate text-right text-xs text-muted" data-tray-summary="skills"></span>
                                                 <x-icon name="chevron" class="chev size-4 text-muted" />
                                             </summary>
-                                            <div class="@container/skills border-t border-line p-2 sm:p-3">
-                                                <div class="grid gap-3 @xl/skills:grid-cols-3">
+                                            <div class="@container/skills border-t border-line p-1.5 sm:p-3">
+                                                <div class="grid gap-2 sm:gap-3 @xl/skills:grid-cols-3">
                                                     @foreach (['10' => 8, '20' => 4, '30' => 1] as $tier => $slots)
                                                         <div class="min-w-0">
-                                                            <div class="mb-1.5 flex items-baseline justify-between">
+                                                            <div class="mb-1 flex items-baseline justify-between sm:mb-1.5">
                                                                 <span class="font-display text-base text-orc-700">{{ $tier }} Badass Points</span>
                                                                 <span class="text-xs font-semibold tabular-nums text-muted"><span data-skill-count="{{ $tier }}">0</span>/{{ $slots }}</span>
                                                             </div>
-                                                            <div class="grid gap-1.5">
+                                                            <div class="grid grid-cols-2 gap-1.5 @xl/skills:grid-cols-1">
                                                                 @for ($i = 0; $i < $slots; $i++)
                                                                     <label class="block" data-skill-slot>
                                                                         <span class="sr-only">{{ $tier }} point skill {{ $i + 1 }}</span>
@@ -286,7 +286,7 @@
                                             <span class="min-w-0 flex-1 truncate text-right text-xs text-muted" data-tray-summary="inventory"></span>
                                             <x-icon name="chevron" class="chev size-4 text-muted" />
                                         </summary>
-                                        <div class="@container/inventory border-t border-line p-2 sm:p-3">
+                                        <div class="@container/inventory border-t border-line p-1.5 sm:p-3" data-inventory-list>
                                             <div class="inv-head mb-1 gap-1.5 px-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted" aria-hidden="true">
                                                 <span class="text-center">#</span><span>Left enchant</span><span>Item</span><span>Right enchant</span><span class="text-center">Rekup</span>
                                             </div>
@@ -332,6 +332,7 @@
                                                     </div>
                                                 @endforeach
                                             </div>
+                                            <button class="inv-spare-toggle mt-1.5 w-full rounded-md border border-dashed border-line-strong py-2 text-xs font-semibold text-muted hover:bg-paper-deep" type="button" data-toggle-spare hidden></button>
                                         </div>
                                     </details>
                                 </div>
