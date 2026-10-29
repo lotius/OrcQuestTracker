@@ -95,7 +95,7 @@ npm test           # the kraft planner, checked against an exhaustive search ove
 - New campaigns start with four orcs. **Add orc** brings in a fifth and sixth; the trash icon removes one (after confirming), clearing their sheet so their cards are free again. **Undo** brings them back.
 - Switch orcs with the **portrait chips** at the top. **Party** shows every orc at once, which is handy for dragging cards between them on a big screen.
 - Pick the **Hero** and type the **Player**. The hero sets the class, health, starting stuff and carrying limits; the **Armor / Hands / Inventory** meters turn red when a limit is exceeded, and the hero's chip gets a red dot.
-- **Skill cards**: each tier (10 / 20 / 30 Badass Points) shows the cards learned plus one empty slot for the next. Only the chosen hero's skills are offered.
+- **Skill cards**: each tier (10 / 20 / 30 Badass Points) shows the cards learned plus one empty slot for the next. Only the chosen hero's skills are offered; their card codes (e.g. `WP 009`) are shown in the picker and can be searched.
 
 ### Equipment and inventory
 
@@ -104,6 +104,7 @@ npm test           # the kraft planner, checked against an exhaustive search ove
 - **Every dropdown is searchable.** Click or tap a field (or focus it and start typing) and type any part of a name or card code, e.g. `kukri`, `189` or `heavy cross`. Arrow keys and Enter pick; Escape cancels. Cards show their weight, hands and card text; enchants show their effect; heroes show class, health and starting stuff. Cards and enchants already used elsewhere are left out. On phones the list opens as a bottom sheet.
 - Hover an item or enchant (desktop) to see its weight, hands, rekup value, kraft cost and effects.
 - **Two-handed weapons** (bows, crossbows, ...) automatically fill both hands; anything that was in the other hand moves to the first free inventory slot.
+- On phones the inventory shows your cards plus one empty slot; **Show all 15 slots** reveals the rest. Gold, resource and potion cards take a single line since they can't hold enchants.
 - **Rekup** (inventory only) marks a card as broken down into resources. It then counts as weight 1, adds its resources to the rekup pool, and **cannot be equipped**: untick Rekup first. Resources, gold and potion cards are always rekup.
 
 ### Moving cards
@@ -128,7 +129,7 @@ npm test           # the kraft planner, checked against an exhaustive search ove
 
 ### Campaign tab
 
-Name the campaign, tick off completed quests for each quest book (with per-book progress), and keep free-form notes.
+Name the campaign, tick off completed quests for each quest book, and keep free-form notes. Each quest book folds away; books you're partway through start open and the rest show just their progress (e.g. `3/4`).
 
 ### History
 
