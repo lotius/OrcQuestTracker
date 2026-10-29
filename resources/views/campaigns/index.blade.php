@@ -5,6 +5,7 @@
 @section('content')
     <div class="mb-4 flex items-center gap-3">
         <h1 class="page-title flex-1">Campaigns</h1>
+        <span class="text-xs font-semibold tabular-nums text-muted" title="Campaigns used of the per-account limit">{{ $campaigns->count() }} / {{ $maxCampaigns }}</span>
         <button class="grid size-10 shrink-0 place-items-center rounded-full bg-orc-600 text-white shadow-md transition-colors hover:bg-orc-700" type="button" data-dialog-open="new-campaign" title="New campaign" aria-label="New campaign"><x-icon name="plus" class="size-5" /></button>
     </div>
 

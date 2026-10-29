@@ -172,6 +172,20 @@ class Campaigns
         throw new InvalidArgumentException('That file is not an OrcQuest tracker campaign.');
     }
 
+    /** How many campaigns import() would create from this data. */
+    public function importableCount(array $data): int
+    {
+        if (($data['format'] ?? null) === self::EXPORT_FORMAT) {
+            return 1;
+        }
+
+        if (is_array($data['campaigns'] ?? null)) {
+            return count(array_filter($data['campaigns'], fn ($campaign) => is_array($campaign) && is_array($campaign['state'] ?? null)));
+        }
+
+        return is_array($data['characters'] ?? null) ? 1 : 0;
+    }
+
     private function appendEvents(Campaign $campaign, array $events): array
     {
         $stored = [];

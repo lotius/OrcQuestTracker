@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
@@ -68,6 +69,10 @@ class AuthController extends Controller
     {
         abort_unless(self::registrationOpen(), 404);
 
+        if (! $this->looksHuman($request)) {
+            throw ValidationException::withMessages(['form' => 'That sign-up looked automated. Wait a moment, then try again.']);
+        }
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:80'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
@@ -94,6 +99,24 @@ class AuthController extends Controller
         $request->session()->regenerateToken();
 
         return redirect()->route('login');
+    }
+
+    /** Bots fill in every field (including the hidden one) and submit instantly; people don't. */
+    private function looksHuman(Request $request): bool
+    {
+        if (filled($request->input('website'))) {
+            return false;
+        }
+
+        try {
+            $shownAt = (int) decrypt((string) $request->input('form_token'));
+        } catch (DecryptException) {
+            return false;
+        }
+
+        $elapsed = now()->timestamp - $shownAt;
+
+        return $elapsed >= config('tracker.signup_min_seconds') && $elapsed <= 86400;
     }
 
     /** The first account inherits the campaigns saved by the pre-login version of the tracker. */

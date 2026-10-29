@@ -6,6 +6,7 @@ This guide puts the tracker on the internet so you can use it from any phone, ta
 - [Option A: cPanel shared hosting (SparkedHost web hosting and similar)](#option-a-cpanel-shared-hosting)
 - [Option B: your own server (VPS)](#option-b-your-own-server-vps)
 - [After the first deploy](#after-the-first-deploy)
+- [Set up email for password resets](#set-up-email-for-password-resets)
 - [Updating to a new version](#updating-to-a-new-version)
 - [Backups](#backups)
 - [Troubleshooting](#troubleshooting)
@@ -88,7 +89,8 @@ DB_CONNECTION=sqlite
 
 LOG_LEVEL=warning
 SESSION_SECURE_COOKIE=true
-ALLOW_REGISTRATION=true   # set to false after you've created your account
+ALLOW_REGISTRATION=true   # anyone can sign up; set to false for a private tracker
+MAX_CAMPAIGNS=25
 ```
 
 3. Create an empty database file: in `orcquest/database`, **+ File** → `database.sqlite`.
@@ -184,8 +186,36 @@ sudo apt install -y certbot python3-certbot-nginx && sudo certbot --nginx -d tra
 ## After the first deploy
 
 1. **Claim the tracker** by creating your account.
-2. **Close registration** so strangers can't sign up: set `ALLOW_REGISTRATION=false` in `.env`, then run `php artisan optimize` again (settings are cached, so `.env` edits only take effect after this; without a terminal, use the cron trick from step 6).
-3. **Bring your existing campaigns** across: on your own computer, open each campaign → `⋮` → **Export to file**; on the live site, **Campaigns** → **Import**. The original pre-login save file (`orcquest-tracker-state.json`) can be imported the same way.
+2. **Decide who can sign up.** Leaving `ALLOW_REGISTRATION=true` lets anyone create an account with their own private campaigns; sign-ups are protected against bots and each account is limited to `MAX_CAMPAIGNS` campaigns. For a private tracker set it to `false`. Either way, run `php artisan optimize` after editing `.env` (settings are cached, so edits only take effect after this; without a terminal, use the cron trick from step 6).
+3. **Set up email** so people can reset forgotten passwords: see the next section.
+4. **Bring your existing campaigns** across: on your own computer, open each campaign → `⋮` → **Export to file**; on the live site, **Campaigns** → **Import**. The original pre-login save file (`orcquest-tracker-state.json`) can be imported the same way.
+
+## Set up email for password resets
+
+The **Forgot password?** link emails a reset link, so the server needs to be able to send mail. Until that's set up, reset emails are only written to `storage/logs/laravel.log`.
+
+**On cPanel hosting** (SparkedHost web hosting and similar):
+
+1. cPanel → **Email Accounts** → **Create** an address such as `tracker@yourdomain.com` with a strong password.
+2. Next to it, click **Connect Devices** and note the **outgoing (SMTP) server** and **SSL port** (usually `mail.yourdomain.com` and `465`).
+3. In the server's `.env`:
+
+```dotenv
+MAIL_MAILER=smtp
+MAIL_SCHEME=smtps
+MAIL_HOST=mail.yourdomain.com
+MAIL_PORT=465
+MAIL_USERNAME=tracker@yourdomain.com
+MAIL_PASSWORD="the email account's password"
+MAIL_FROM_ADDRESS=tracker@yourdomain.com
+MAIL_FROM_NAME="OrcQuest Tracker"
+```
+
+4. Run `php artisan optimize`, then try **Forgot password?** with your own email. If the email doesn't arrive, check your spam folder and `storage/logs/laravel.log` for an SMTP error (a wrong port or password is the usual cause; some hosts want port `587` with `MAIL_SCHEME=smtp`).
+
+**On a VPS**, use any SMTP provider (many have free tiers for a few hundred emails a month) and put its host, port, username and password in the same settings.
+
+Reset links expire after 60 minutes, and the form only allows a few requests per minute.
 
 ## Updating to a new version
 
@@ -220,4 +250,5 @@ Everything lives in **`database/database.sqlite`** (or your MySQL database). Dow
 | **You see a file listing or the raw `index.php`** | The document root points at `orcquest` instead of `orcquest/public`. |
 | **419 Page Expired** on sign-in | Sessions can't be stored: make `storage/framework/sessions` writable. If you use HTTPS, keep `SESSION_SECURE_COOKIE=true` and make sure `APP_URL` starts with `https://`. |
 | **`.env` changes don't take effect** | Settings are cached: run `php artisan optimize` (or `php artisan config:clear`). |
+| **Password-reset emails never arrive** | Check `MAIL_*` in `.env` (then `php artisan optimize`), the spam folder, and `storage/logs/laravel.log` for SMTP errors. See [Set up email](#set-up-email-for-password-resets). |
 | **"Not saved: changed elsewhere"** banner | The campaign was saved from another tab or device after you opened it. Reload the page; nothing was overwritten. |

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\TrackerController;
 use Illuminate\Support\Facades\Route;
@@ -11,6 +12,10 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:10,1');
+    Route::get('/forgot-password', [PasswordResetController::class, 'request'])->name('password.request');
+    Route::post('/forgot-password', [PasswordResetController::class, 'email'])->name('password.email')->middleware('throttle:6,1');
+    Route::get('/reset-password/{token}', [PasswordResetController::class, 'edit'])->name('password.reset');
+    Route::post('/reset-password', [PasswordResetController::class, 'update'])->name('password.update')->middleware('throttle:6,1');
 });
 
 Route::middleware('auth')->group(function () {

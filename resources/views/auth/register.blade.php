@@ -9,6 +9,12 @@
     @endif
     <form class="grid gap-4" method="post" action="{{ route('register') }}">
         @csrf
+        {{-- Bot traps: a field people never see, and the time the form was shown. --}}
+        <div class="absolute -left-[10000px] top-auto size-px overflow-hidden" aria-hidden="true">
+            <label>Leave this field empty <input type="text" name="website" value="" tabindex="-1" autocomplete="off"></label>
+        </div>
+        <input type="hidden" name="form_token" value="{{ encrypt(now()->timestamp) }}">
+        @error('form') <p class="rounded-md bg-danger/10 px-3 py-2 text-sm font-medium text-danger">{{ $message }}</p> @enderror
         <label>
             <span class="field-label">Name</span>
             <input class="control" name="name" value="{{ old('name') }}" autocomplete="name" required autofocus>

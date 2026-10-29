@@ -72,8 +72,10 @@ npm test           # the kraft planner, checked against an exhaustive search ove
 
 ### Accounts
 
-- The **first account** created on a fresh install owns the tracker. Anyone can create further accounts until you set `ALLOW_REGISTRATION=false` (see [Configuration](#configuration)).
-- Campaigns are private: each account only ever sees its own.
+- Anyone can **create an account** and keep their own campaigns; campaigns are private, so each account only ever sees its own. (To run a private tracker instead, set `ALLOW_REGISTRATION=false`; see [Configuration](#configuration).)
+- The **first account** created on a fresh install also inherits any campaigns saved by the original, pre-login version.
+- **Forgot your password?** Use the link on the sign-in page to get a reset link by email. (On your own computer, emails are written to `storage/logs/laravel.log` instead of being sent.)
+- Each account can keep up to **25 campaigns** (adjustable with `MAX_CAMPAIGNS`).
 - Change your name, email or password under **Account**. Sign out from the header (or the `⋮` menu on a campaign).
 
 ### Campaigns
@@ -156,7 +158,9 @@ Settings live in `.env` (copied from `.env.example` during setup).
 | `APP_DEBUG` | `true` | **Must be `false` on a live server.** |
 | `APP_URL` | `http://localhost` | The address the tracker is served from, e.g. `https://tracker.example.com`. |
 | `APP_KEY` | *(generated)* | Encryption key. Generate once with `php artisan key:generate`; never share it. |
-| `ALLOW_REGISTRATION` | `true` | Set to `false` once your account exists so strangers cannot sign up. The first account can always be created. |
+| `ALLOW_REGISTRATION` | `true` | Whether anyone can create an account. Set to `false` for a private tracker; the first account can always be created. |
+| `MAX_CAMPAIGNS` | `25` | The most campaigns one account may keep. |
+| `MAIL_MAILER`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_SCHEME`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS` | `log` | How password-reset emails are sent. `log` writes them to `storage/logs/laravel.log`; on a live server use your host's SMTP details (see the [deployment guide](docs/DEPLOYMENT.md#set-up-email-for-password-resets)). |
 | `DB_CONNECTION` | `sqlite` | `sqlite` (a file at `database/database.sqlite`) or `mysql`/`mariadb` with the usual `DB_HOST`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`. |
 | `SESSION_LIFETIME` | `120` | Minutes before an idle session expires (*Keep me signed in* lasts much longer). |
 

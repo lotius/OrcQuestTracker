@@ -4,6 +4,9 @@
 @section('heading', 'Sign in')
 
 @section('content')
+    @if (session('status'))
+        <p class="mb-4 rounded-md bg-sage-soft px-3 py-2 text-sm text-orc" role="status">{{ session('status') }}</p>
+    @endif
     <form class="grid gap-4" method="post" action="{{ route('login') }}">
         @csrf
         <label>
@@ -11,7 +14,10 @@
             <input class="control" type="email" name="email" value="{{ old('email') }}" autocomplete="username" required autofocus>
         </label>
         <label>
-            <span class="field-label">Password</span>
+            <span class="flex items-baseline justify-between gap-2">
+                <span class="field-label">Password</span>
+                <a class="text-xs font-semibold text-orc-700 underline-offset-2 hover:underline" href="{{ route('password.request') }}">Forgot password?</a>
+            </span>
             <input class="control" type="password" name="password" autocomplete="current-password" required>
         </label>
         @error('email')

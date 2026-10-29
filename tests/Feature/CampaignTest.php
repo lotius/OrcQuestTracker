@@ -182,4 +182,22 @@ class CampaignTest extends TestCase
 
         $this->post(route('campaigns.import'), ['file' => $file])->assertSessionHasErrors('file');
     }
+
+    public function test_accounts_have_a_campaign_limit(): void
+    {
+        config(['tracker.max_campaigns' => 2]);
+        $first = $this->campaign(name: 'One');
+        $this->campaign(name: 'Two');
+
+        $this->post(route('campaigns.store'), ['name' => 'Three'])->assertSessionHasErrors('name');
+        $this->post(route('campaigns.duplicate', $first))->assertSessionHas('status');
+        $export = json_encode(app(Campaigns::class)->export($first));
+        $this->post(route('campaigns.import'), ['file' => UploadedFile::fake()->createWithContent('one.json', $export)])->assertSessionHasErrors('file');
+
+        $this->assertSame(2, $this->user->campaigns()->count());
+
+        $this->delete(route('campaigns.destroy', $first));
+        $this->post(route('campaigns.store'), ['name' => 'Three'])->assertRedirect();
+        $this->assertSame(2, $this->user->campaigns()->count());
+    }
 }

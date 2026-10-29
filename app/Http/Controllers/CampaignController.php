@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Campaign;
+use App\Models\User;
 use App\Services\Campaigns;
 use App\Services\OrcQuestCatalog;
 use Illuminate\Http\RedirectResponse;
@@ -47,7 +48,9 @@ class CampaignController extends Controller
                 'quests' => collect($campaign->state['campaign'] ?? [])->filter()->count(),
             ]);
 
-        return view('campaigns.index', compact('campaigns', 'questCount'));
+        $maxCampaigns = config('tracker.max_campaigns');
+
+        return view('campaigns.index', compact('campaigns', 'questCount', 'maxCampaigns'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -56,6 +59,10 @@ class CampaignController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'copy_from' => ['nullable', 'integer'],
         ]);
+
+        if (! $this->hasRoom($request->user())) {
+            return back()->withInput()->withErrors(['name' => $this->limitMessage()]);
+        }
 
         $source = isset($data['copy_from']) ? $request->user()->campaigns()->find($data['copy_from']) : null;
         $campaign = $source
@@ -87,6 +94,10 @@ class CampaignController extends Controller
     {
         Gate::authorize('manage', $campaign);
 
+        if (! $this->hasRoom($campaign->user)) {
+            return back()->with('status', $this->limitMessage());
+        }
+
         return redirect()->route('campaigns.show', $this->campaigns->duplicate($campaign, $campaign->name.' (copy)'));
     }
 
@@ -98,6 +109,16 @@ class CampaignController extends Controller
         $campaign->delete();
 
         return redirect()->route('campaigns.index')->with('status', "Deleted {$name}.");
+    }
+
+    private function hasRoom(User $user, int $adding = 1): bool
+    {
+        return $user->campaigns()->count() + $adding <= config('tracker.max_campaigns');
+    }
+
+    private function limitMessage(): string
+    {
+        return 'You have reached the limit of '.config('tracker.max_campaigns').' campaigns. Delete or export one you no longer play to make room.';
     }
 
     public function export(Campaign $campaign): StreamedResponse
@@ -119,7 +140,13 @@ class CampaignController extends Controller
 
         try {
             $data = json_decode($request->file('file')->get(), true, flags: JSON_THROW_ON_ERROR);
-            $imported = $this->campaigns->import($request->user(), is_array($data) ? $data : []);
+            $data = is_array($data) ? $data : [];
+
+            if (! $this->hasRoom($request->user(), max(1, $this->campaigns->importableCount($data)))) {
+                return back()->withErrors(['file' => $this->limitMessage()]);
+            }
+
+            $imported = $this->campaigns->import($request->user(), $data);
         } catch (\JsonException|InvalidArgumentException) {
             return back()->withErrors(['file' => 'That file is not an OrcQuest tracker campaign.']);
         }
