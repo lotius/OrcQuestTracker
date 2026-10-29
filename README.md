@@ -101,6 +101,7 @@ npm test           # the kraft planner, checked against an exhaustive search ove
 
 - Every equipment slot (**Hand 1, Hand 2, Armor, Artifact**) and inventory slot holds one card plus a **left** and **right enchant**. Enchants travel with their card when it moves.
 - **Stars** after an item name show its kraft level: ★ can be upgraded, ★★ was upgraded and can be again, ★★★ is fully upgraded. Potions, resources, gold and relics have no level.
+- **Every dropdown is searchable.** Click or tap a field (or focus it and start typing) and type any part of a name or card code, e.g. `kukri`, `189` or `heavy cross`. Arrow keys and Enter pick; Escape cancels. Cards show their weight, hands and card text; enchants show their effect; heroes show class, health and starting stuff. Cards and enchants already used elsewhere are left out. On phones the list opens as a bottom sheet.
 - Hover an item or enchant (desktop) to see its weight, hands, rekup value, kraft cost and effects.
 - **Two-handed weapons** (bows, crossbows, ...) automatically fill both hands; anything that was in the other hand moves to the first free inventory slot.
 - **Rekup** (inventory only) marks a card as broken down into resources. It then counts as weight 1, adds its resources to the rekup pool, and **cannot be equipped**: untick Rekup first. Resources, gold and potion cards are always rekup.
@@ -176,6 +177,7 @@ Settings live in `.env` (copied from `.env.example` during setup).
 | `resources/views/tracker.blade.php` | The campaign page. |
 | `resources/js/app.js` | Front-end behaviour (rules, drag and drop, move sheet, auto-save). |
 | `resources/js/kraft.js` | The kraft payment planner (pure functions, unit tested). |
+| `resources/js/picker.js` | The searchable picker used by every dropdown. |
 | `resources/css/app.css` | Theme and component styles (Tailwind CSS 4). |
 | `scripts/package-release.ps1` | Builds an upload-ready zip for shared hosting (see the deployment guide). |
 
