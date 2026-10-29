@@ -279,6 +279,11 @@
         @apply rounded-md ring-2 ring-orc-600 ring-offset-2 ring-offset-paper;
     }
 
+    [data-slot][data-drop-target="blocked"] {
+        @apply rounded-md ring-2 ring-danger ring-offset-2 ring-offset-paper;
+        cursor: not-allowed;
+    }
+
     [data-drag-handle] {
         touch-action: none;
         @apply cursor-grab active:cursor-grabbing;

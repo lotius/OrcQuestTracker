@@ -1385,28 +1385,42 @@ if (catalog && root) {
         return target.closest?.('[data-drag-handle]') ? slotItemSelect(target) : null;
     };
 
-    const canDropItem = (source, destination) => {
-        if (! source || ! destination || source === destination) {
-            return false;
+    /**
+     * Why an item cannot go to a slot (null when it can). Equipping a card marked for rekup is allowed and
+     * simply un-marks it; only always-rekup cards (resources, gold, potions) can never be equipped.
+     */
+    const dropBlockReason = (source, destination) => {
+        if (! destination) {
+            return 'Inventory full';
         }
 
-        if (source.disabled || destination.disabled) {
-            return false;
+        if (destination.dataset.lockedByHero === 'true' || source.dataset.lockedByHero === 'true') {
+            return 'Choose a hero first';
         }
 
-        if (isRekupInventoryItem(source) && ! isInventorySelect(destination)) {
-            return false;
+        if (destination.dataset.twoHandMirror === 'true') {
+            return 'Two-handed weapon in Hand 1';
         }
 
-        return ! (! isInventorySelect(source) && isRekupInventoryItem(destination));
+        if (! isInventorySelect(destination) && itemAlwaysRekup(source.value)) {
+            return 'Resources, gold and potions can\'t be equipped';
+        }
+
+        if (! isInventorySelect(source) && itemAlwaysRekup(destination.value)) {
+            return 'Can\'t swap a resource card into equipment';
+        }
+
+        return source.disabled || destination.disabled ? 'Unavailable' : null;
     };
+
+    const canDropItem = (source, destination) => Boolean(source && destination && source !== destination && ! dropBlockReason(source, destination));
 
     let pointerDrag = null;
     let suppressNextClick = false;
 
-    const setDropTarget = (select) => {
+    const setDropTarget = (select, state = 'true') => {
         all('[data-slot][data-drop-target]').forEach((slot) => slot.removeAttribute('data-drop-target'));
-        select?.closest('[data-slot]')?.setAttribute('data-drop-target', 'true');
+        select?.closest('[data-slot]')?.setAttribute('data-drop-target', state);
     };
 
     const createDragGhost = (select) => {
@@ -1486,8 +1500,10 @@ if (catalog && root) {
         moveGhost(pointerDrag.ghost, event.clientX, event.clientY);
 
         const destination = slotItemSelect(document.elementFromPoint(event.clientX, event.clientY));
+        const blocked = destination && destination !== pointerDrag.source ? dropBlockReason(pointerDrag.source, destination) : null;
         pointerDrag.target = canDropItem(pointerDrag.source, destination) ? destination : null;
-        setDropTarget(pointerDrag.target);
+        pointerDrag.blocked = blocked;
+        setDropTarget(pointerDrag.target || (blocked ? destination : null), blocked ? 'blocked' : 'true');
     }, { passive: false });
 
     window.addEventListener('pointerup', () => {
@@ -1496,11 +1512,19 @@ if (catalog && root) {
         }
 
         const wasDragging = pointerDrag.active;
-        const { source, target } = pointerDrag;
+        const { source, target, blocked } = pointerDrag;
         endDrag();
 
         if (wasDragging && canDropItem(source, target)) {
+            const unmarked = isRekupInventoryItem(source) && ! isInventorySelect(target);
+            const label = itemLabel(source.value);
             swapItemSelects(source, target);
+
+            if (unmarked) {
+                showToast(`Equipped ${label}; it is no longer marked for rekup`);
+            }
+        } else if (wasDragging && blocked) {
+            showToast(blocked);
         }
 
         if (wasDragging) {
@@ -1549,15 +1573,7 @@ if (catalog && root) {
             return 'Two-handed weapon in Hand 1';
         }
 
-        if (isRekupInventoryItem(source) && ! isInventorySelect(destination)) {
-            return 'Rekup cards stay in inventory';
-        }
-
-        if (! isInventorySelect(source) && isRekupInventoryItem(destination)) {
-            return 'Holds a rekup card';
-        }
-
-        return canDropItem(source, destination) ? null : 'Unavailable';
+        return dropBlockReason(source, destination);
     };
 
     const moveOption = (label, destination, occupant, source) => {
@@ -1660,11 +1676,12 @@ if (catalog && root) {
 
         const label = itemLabel(moveSource.value);
         const where = `${characterName(destination.closest('[data-character]'))} · ${destination.dataset.location}`;
+        const unmarked = isRekupInventoryItem(moveSource) && ! isInventorySelect(destination);
         closeModal(document.querySelector('[data-modal="move-item"]'));
         swapItemSelects(moveSource, destination);
         moveSource = null;
         moveTargets = [];
-        showToast(`Moved ${label} to ${where}`);
+        showToast(`Moved ${label} to ${where}${unmarked ? ' (no longer marked for rekup)' : ''}`);
     };
 
     const refreshMoveButtons = () => {
