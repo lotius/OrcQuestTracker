@@ -350,7 +350,7 @@
 
             {{-- Kraft & Rekup ------------------------------------------------------------------------- --}}
             <section class="grid items-start gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]" data-tab-panel="resources" hidden>
-                <h2 class="page-title lg:col-span-2">Kraft &amp; Rekup</h2>
+                <h2 class="page-title hidden sm:flex lg:col-span-2">Kraft &amp; Rekup</h2>
 
                 <div class="grid gap-4">
                     <div class="chamfer">
@@ -422,7 +422,7 @@
 
             {{-- Campaign ------------------------------------------------------------------------------ --}}
             <section class="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]" data-tab-panel="campaign" hidden>
-                <h2 class="page-title lg:col-span-2">Campaign</h2>
+                <h2 class="page-title hidden sm:flex lg:col-span-2">Campaign</h2>
 
                 <div class="panel min-w-0 p-3 sm:p-4">
                     <div class="mb-3 grid items-end gap-3 sm:grid-cols-[minmax(0,26rem)_1fr]">
@@ -432,14 +432,23 @@
                         </label>
                         <p class="text-sm text-muted sm:text-right"><span class="text-2xl font-bold tabular-nums text-orc-700" data-campaign-count>{{ collect($state['campaign'])->filter()->count() }}</span> quests completed</p>
                     </div>
-                    <div class="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+                    <div class="grid items-start gap-2 sm:grid-cols-2 sm:gap-3 2xl:grid-cols-3">
+                        @php
+                            // Books in progress start open; finished and untouched books start folded (their count shows).
+                            $questProgress = $campaignQuests->map(fn ($quests, $group) => $quests->filter(fn ($quest) => $state['campaign'][md5($group.'|'.$quest['quest'])] ?? false)->count());
+                            $openBooks = $campaignQuests->keys()->filter(fn ($group) => $questProgress[$group] > 0 && $questProgress[$group] < count($campaignQuests[$group]));
+                            if ($openBooks->isEmpty()) {
+                                $openBooks = $campaignQuests->keys()->filter(fn ($group) => $questProgress[$group] < count($campaignQuests[$group]))->take(1);
+                            }
+                        @endphp
                         @foreach ($campaignQuests as $group => $quests)
-                            <div class="rounded-lg border border-line bg-white/60" data-campaign-group>
-                                <div class="flex items-baseline justify-between gap-2 border-b border-line px-3 py-2">
-                                    <h3 class="section-title text-base">{{ $group }}</h3>
-                                    <span class="shrink-0 text-xs font-semibold tabular-nums text-muted"><span data-campaign-group-count>0</span>/{{ count($quests) }}</span>
-                                </div>
-                                <div class="grid p-1">
+                            <details class="tray rounded-lg border border-line bg-white/60" data-campaign-group @if ($openBooks->contains($group)) open @endif>
+                                <summary class="!py-2">
+                                    <h3 class="section-title flex-1 text-base">{{ $group }}</h3>
+                                    <span class="shrink-0 text-xs font-semibold tabular-nums text-muted"><span data-campaign-group-count>{{ $questProgress[$group] }}</span>/{{ count($quests) }}</span>
+                                    <x-icon name="chevron" class="chev size-4 text-muted" />
+                                </summary>
+                                <div class="grid border-t border-line p-1">
                                     @foreach ($quests as $quest)
                                         @php $key = md5($group.'|'.$quest['quest']); @endphp
                                         <label class="flex min-h-10 cursor-pointer items-center gap-2.5 rounded px-2 text-sm hover:bg-paper-deep has-checked:text-muted sm:min-h-9">
@@ -448,7 +457,7 @@
                                         </label>
                                     @endforeach
                                 </div>
-                            </div>
+                            </details>
                         @endforeach
                     </div>
                 </div>
@@ -465,7 +474,7 @@
 
         {{-- History (outside the form: its filters are not tracker state) ------------------------ --}}
         <section class="grid gap-4" data-tab-panel="history" hidden>
-            <h2 class="page-title">History</h2>
+            <h2 class="page-title hidden sm:flex">History</h2>
             <div class="panel p-3 sm:p-4">
                 <div class="mb-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem_12rem]">
                     <label>
