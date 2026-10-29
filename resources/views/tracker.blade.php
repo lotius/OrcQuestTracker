@@ -207,8 +207,9 @@
                                                 @foreach ($equipmentSlots as $equip)
                                                     <div class="rounded-md border border-line bg-paper p-2" data-slot>
                                                         <div class="mb-1.5 flex items-center gap-1">
-                                                            <span class="-ml-0.5 rounded p-0.5 text-line-strong hover:bg-paper-deep hover:text-muted" data-drag-handle title="Drag to move this item"><x-icon name="grip" class="size-4" /></span>
+                                                            <button class="-ml-0.5 rounded p-0.5 text-line-strong hover:bg-paper-deep hover:text-muted" type="button" data-drag-handle data-move-item title="Tap to move, or drag" aria-label="Move this item"><x-icon name="grip" class="size-4" /></button>
                                                             <span class="text-sm font-semibold text-ink-soft">{{ $equip['label'] }}</span>
+                                                            <button class="ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-orc-700 hover:bg-sage-soft" type="button" data-move-item data-needs-item><x-icon name="move" class="size-3.5" /> Move</button>
                                                         </div>
                                                         <div class="equip-fields">
                                                             <label class="eq-left">
@@ -294,10 +295,10 @@
                                                 @foreach ($character['inventory'] as $index => $row)
                                                     @php $inventoryItem = $items->firstWhere('index', $row['item']); @endphp
                                                     <div class="inv-row rounded-md border border-transparent p-0.5 odd:bg-paper-deep/50" data-inventory-row data-slot data-empty="{{ $row['item'] === '' ? 'true' : 'false' }}">
-                                                        <div class="inv-num flex flex-col items-center justify-center rounded text-muted hover:bg-paper-deep" data-drag-handle title="Drag to move this item">
+                                                        <button class="inv-num flex flex-col items-center justify-center rounded text-muted hover:bg-paper-deep" type="button" data-drag-handle data-move-item title="Tap to move, or drag" aria-label="Move item in slot {{ $index + 1 }}">
                                                             <span class="text-[11px] font-semibold tabular-nums">{{ $index + 1 }}</span>
                                                             <x-icon name="grip" class="size-3.5 text-line-strong" />
-                                                        </div>
+                                                        </button>
                                                         <label class="inv-left">
                                                             <span class="sr-only">Left enchant</span>
                                                             <select class="control" name="characters[{{ $slot }}][inventory][{{ $index }}][left_enchant]" data-filter="enchant" data-enchant-side="left" data-needs-hero @disabled(! $selectedHero || $row['item'] === '')>
@@ -508,6 +509,19 @@
                 <p><strong class="text-ink">Keep the most wood / metal / leather / gold:</strong> avoids consuming cards that generate that resource whenever possible.</p>
                 <p class="rounded-md bg-sage-soft p-3 text-orc"><em>Gorbag's advice:</em> any excess resources from a kraft are lost, so waste matters.</p>
             </div>
+        </div>
+    </div>
+
+    <div class="fixed inset-0 z-50 hidden bg-ink/50" data-modal="move-item" role="dialog" aria-modal="true" aria-labelledby="move-item-title">
+        <div class="absolute inset-x-0 bottom-0 flex max-h-[85dvh] flex-col rounded-t-2xl bg-paper shadow-2xl sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-[8vh] sm:max-h-[84vh] sm:w-[30rem] sm:-translate-x-1/2 sm:rounded-lg">
+            <div class="torn-bottom z-10 flex items-center gap-2 rounded-t-2xl bg-orc px-4 py-3 text-white sm:rounded-t-lg">
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-sage" data-move-from>Move</p>
+                    <h2 class="font-display truncate text-xl" id="move-item-title" data-move-title></h2>
+                </div>
+                <button class="icon-btn ml-auto size-9 hover:bg-white/10" type="button" data-modal-close aria-label="Close"><x-icon name="x" /></button>
+            </div>
+            <div class="overflow-y-auto overscroll-contain px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-5" data-move-list></div>
         </div>
     </div>
 

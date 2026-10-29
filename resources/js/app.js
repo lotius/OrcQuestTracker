@@ -164,11 +164,24 @@ if (catalog && root) {
         }
 
         modal.classList.remove('hidden');
+        document.documentElement.classList.add('overflow-hidden');
         modal.querySelector('[data-modal-close]')?.focus();
     };
 
     const closeModal = (modal = document.querySelector('[data-modal]:not(.hidden)')) => {
         modal?.classList.add('hidden');
+        document.documentElement.classList.remove('overflow-hidden');
+    };
+
+    const showToast = (text) => {
+        document.querySelector('[data-js-toast]')?.remove();
+        const toast = document.createElement('div');
+        toast.className = 'toast fixed inset-x-0 bottom-[5.5rem] z-50 mx-auto w-max max-w-[90vw] rounded-full bg-orc-600 px-4 py-2 text-center text-sm font-semibold text-white shadow-lg md:bottom-auto md:top-[4.25rem]';
+        toast.dataset.jsToast = 'true';
+        toast.setAttribute('role', 'status');
+        toast.textContent = text;
+        document.body.appendChild(toast);
+        window.setTimeout(() => toast.remove(), 4600);
     };
 
     // ---- Undo / redo ---------------------------------------------------------------------------------
@@ -520,7 +533,9 @@ if (catalog && root) {
                     continue;
                 }
 
-                const unavailable = (counts.get(key) || 0) - (own === key ? 1 : 0) > 0;
+                // Never disable a select's own current option: browsers drop disabled selected options from
+                // form submissions, which would erase the item (e.g. a two-handed weapon held in both hands).
+                const unavailable = own !== key && counts.has(key);
                 if (option.disabled !== unavailable) {
                     option.disabled = unavailable;
                     option.hidden = unavailable;
@@ -1505,6 +1520,159 @@ if (catalog && root) {
         suppressNextClick = false;
     });
 
+    // ---- Tap to move (a phone-friendly alternative to dragging across the page) ------------------------
+
+    let moveSource = null;
+    let moveTargets = [];
+
+    const moveSourceFor = (element) => {
+        let select = slotItemSelect(element);
+
+        // The mirrored second hand stands for the two-handed weapon held in Hand 1.
+        if (select?.dataset.twoHandMirror === 'true') {
+            select = handSelect(select.closest('[data-character]'), 'hand_item_1');
+        }
+
+        return select?.value ? select : null;
+    };
+
+    const moveBlockReason = (source, destination) => {
+        if (! destination) {
+            return 'Inventory full';
+        }
+
+        if (destination.dataset.lockedByHero === 'true') {
+            return 'Choose a hero first';
+        }
+
+        if (destination.dataset.twoHandMirror === 'true') {
+            return 'Two-handed weapon in Hand 1';
+        }
+
+        if (isRekupInventoryItem(source) && ! isInventorySelect(destination)) {
+            return 'Rekup cards stay in inventory';
+        }
+
+        if (! isInventorySelect(source) && isRekupInventoryItem(destination)) {
+            return 'Holds a rekup card';
+        }
+
+        return canDropItem(source, destination) ? null : 'Unavailable';
+    };
+
+    const moveOption = (label, destination, occupant, source) => {
+        const reason = moveBlockReason(source, destination);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'flex min-h-12 w-full items-center gap-3 rounded-md border border-line bg-white px-3 py-2 text-left transition-colors enabled:hover:border-orc-600 enabled:hover:bg-sage-soft enabled:active:bg-sage-soft disabled:cursor-not-allowed disabled:bg-paper-deep/60';
+        button.disabled = Boolean(reason);
+
+        if (! reason) {
+            button.dataset.moveTo = String(moveTargets.push(destination) - 1);
+        }
+
+        const name = document.createElement('span');
+        name.className = 'w-[4.5rem] shrink-0 text-xs font-semibold uppercase tracking-wide text-muted';
+        name.textContent = label;
+
+        const detail = document.createElement('span');
+        detail.className = `min-w-0 flex-1 truncate text-sm ${occupant.filled ? 'font-medium text-ink' : 'text-muted'}`;
+        detail.textContent = occupant.text;
+
+        const action = document.createElement('span');
+        action.className = `shrink-0 text-[11px] font-semibold ${reason ? 'text-muted' : 'text-orc-700'}`;
+        action.textContent = reason || (occupant.filled ? 'Swap' : 'Move here');
+
+        button.append(name, detail, action);
+
+        return button;
+    };
+
+    const openMoveSheet = (source) => {
+        const list = document.querySelector('[data-move-list]');
+        if (! list) {
+            return;
+        }
+
+        const sourceCard = source.closest('[data-character]');
+        moveSource = source;
+        moveTargets = [];
+        document.querySelector('[data-move-title]').textContent = itemLabel(source.value);
+        document.querySelector('[data-move-from]').textContent = `Move from ${characterName(sourceCard)} · ${source.dataset.location}`;
+        list.replaceChildren();
+
+        const cards = characterCards().filter(isActive);
+        [sourceCard, ...cards.filter((card) => card !== sourceCard)].forEach((card) => {
+            const section = document.createElement('section');
+            section.className = 'mb-4 last:mb-0';
+
+            const heading = document.createElement('h3');
+            heading.className = 'mb-1.5 flex items-center gap-2';
+            const hero = heroById[value(card.querySelector('[data-hero-select]'))];
+            if (hero?.icon) {
+                const icon = document.createElement('img');
+                icon.className = 'size-7 rounded-full object-cover ring-1 ring-black/10';
+                icon.src = hero.icon;
+                icon.alt = '';
+                heading.append(icon);
+            }
+            const name = document.createElement('span');
+            name.className = 'font-display text-lg text-orc-700';
+            name.textContent = characterName(card);
+            heading.append(name);
+            if (card === sourceCard) {
+                const tag = document.createElement('span');
+                tag.className = 'rounded-full bg-paper-deep px-2 py-0.5 text-[11px] font-semibold text-muted';
+                tag.textContent = 'Carrying it now';
+                heading.append(tag);
+            }
+
+            const options = document.createElement('div');
+            options.className = 'grid gap-1.5';
+
+            all('select[data-filter="item"][name*="[equipment]"]', card)
+                .filter((select) => select !== source)
+                .forEach((select) => {
+                    const occupant = select.dataset.twoHandMirror === 'true'
+                        ? { text: `${itemLabel(select.value)} (both hands)`, filled: true }
+                        : { text: select.value ? itemLabel(select.value) : 'Empty', filled: Boolean(select.value) };
+                    options.append(moveOption(select.dataset.location, select, occupant, source));
+                });
+
+            if (! (card === sourceCard && isInventorySelect(source))) {
+                const free = firstEmptyInventorySelect(card);
+                options.append(moveOption('Inventory', free, { text: free ? `${free.dataset.location} is free` : 'No free slot', filled: false }, source));
+            }
+
+            section.append(heading, options);
+            list.append(section);
+        });
+
+        openModal('move-item');
+    };
+
+    const moveItemTo = (position) => {
+        const destination = moveTargets[position];
+
+        if (! destination || ! moveSource) {
+            return;
+        }
+
+        const label = itemLabel(moveSource.value);
+        const where = `${characterName(destination.closest('[data-character]'))} · ${destination.dataset.location}`;
+        closeModal(document.querySelector('[data-modal="move-item"]'));
+        swapItemSelects(moveSource, destination);
+        moveSource = null;
+        moveTargets = [];
+        showToast(`Moved ${label} to ${where}`);
+    };
+
+    const refreshMoveButtons = () => {
+        all('[data-move-item][data-needs-item]').forEach((button) => {
+            button.hidden = ! slotItemSelect(button)?.value;
+        });
+    };
+
     // ---- Clicks ----------------------------------------------------------------------------------------
 
     document.addEventListener('click', (event) => {
@@ -1535,6 +1703,21 @@ if (catalog && root) {
 
         if (target.matches?.('[data-modal]')) {
             closeModal(target);
+            return;
+        }
+
+        const moveButton = target.closest?.('[data-move-item]');
+        if (moveButton) {
+            const source = moveSourceFor(moveButton);
+            if (source) {
+                openMoveSheet(source);
+            }
+            return;
+        }
+
+        const moveDestination = target.closest?.('[data-move-to]');
+        if (moveDestination) {
+            moveItemTo(Number(moveDestination.dataset.moveTo));
             return;
         }
 
@@ -1620,6 +1803,7 @@ if (catalog && root) {
         refreshItemTooltips();
         refreshEnchantTooltips();
         refreshClearButtons();
+        refreshMoveButtons();
         refreshCharacterTabs();
     };
 

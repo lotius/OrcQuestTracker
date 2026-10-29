@@ -154,7 +154,9 @@ Some cards are automatically locked into Rekup status because they are not meani
 
 These cards appear with the Rekup checkbox already checked and disabled. Their enchant slots are also cleared and disabled because automatic-Rekup cards are not usable gear. Empty inventory slots also keep the Rekup checkbox disabled until an item is selected.
 
-Inventory items can be dragged between inventory slots and equipment slots, either by the item field (mouse) or by the grip handle beside each slot (mouse, touch or pen). When items are moved, their rekup state is preserved where appropriate. Always-rekup items stay checked and locked even after being moved.
+Inventory items can be dragged between inventory slots and equipment slots, either by the item field (mouse) or by the grip handle beside each slot (mouse, touch or pen).
+
+On a phone it is easier to tap instead: tap the slot number or grip (or `Move` on an equipment slot) to open a sheet listing every destination in the warband: each orc's Hand 1, Hand 2, Armor, Artifact and first free inventory slot. Each destination shows what it holds (the move becomes a swap) or why it is unavailable, e.g. rekup cards stay in inventory. When items are moved, their rekup state is preserved where appropriate. Always-rekup items stay checked and locked even after being moved.
 
 Two-handed item handling is automatic:
 
