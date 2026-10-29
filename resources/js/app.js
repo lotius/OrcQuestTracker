@@ -1503,8 +1503,9 @@ if (catalog && root) {
     };
 
     /**
-     * Why an item cannot go to a slot (null when it can). Equipping a card marked for rekup is allowed and
-     * simply un-marks it; only always-rekup cards (resources, gold, potions) can never be equipped.
+     * Why an item cannot go to a slot (null when it can). A card marked for rekup counts as destroyed, so it
+     * stays in inventory until the player unticks Rekup; always-rekup cards (resources, gold, potions) can
+     * never be equipped.
      */
     const dropBlockReason = (source, destination) => {
         if (! destination) {
@@ -1523,8 +1524,12 @@ if (catalog && root) {
             return 'Resources, gold and potions can\'t be equipped';
         }
 
-        if (! isInventorySelect(source) && itemAlwaysRekup(destination.value)) {
-            return 'Can\'t swap a resource card into equipment';
+        if (! isInventorySelect(destination) && isRekupInventoryItem(source)) {
+            return 'Marked for rekup (destroyed): untick Rekup first to equip it';
+        }
+
+        if (! isInventorySelect(source) && isRekupInventoryItem(destination)) {
+            return 'That slot holds a card marked for rekup';
         }
 
         return source.disabled || destination.disabled ? 'Unavailable' : null;
@@ -1633,13 +1638,7 @@ if (catalog && root) {
         endDrag();
 
         if (wasDragging && canDropItem(source, target)) {
-            const unmarked = isRekupInventoryItem(source) && ! isInventorySelect(target);
-            const label = itemLabel(source.value);
             swapItemSelects(source, target);
-
-            if (unmarked) {
-                showToast(`Equipped ${label}; it is no longer marked for rekup`);
-            }
         } else if (wasDragging && blocked) {
             showToast(blocked);
         }
@@ -1793,12 +1792,11 @@ if (catalog && root) {
 
         const label = itemLabel(moveSource.value);
         const where = `${characterName(destination.closest('[data-character]'))} · ${destination.dataset.location}`;
-        const unmarked = isRekupInventoryItem(moveSource) && ! isInventorySelect(destination);
         closeModal(document.querySelector('[data-modal="move-item"]'));
         swapItemSelects(moveSource, destination);
         moveSource = null;
         moveTargets = [];
-        showToast(`Moved ${label} to ${where}${unmarked ? ' (no longer marked for rekup)' : ''}`);
+        showToast(`Moved ${label} to ${where}`);
     };
 
     const refreshMoveButtons = () => {
