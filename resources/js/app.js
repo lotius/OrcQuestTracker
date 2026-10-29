@@ -1,5 +1,6 @@
 import { findKraftPlan, resourceBag, resourceNames, subtractBags } from './kraft.js';
 import { createHistoryView } from './history.js';
+import { createPicker } from './picker.js';
 
 // Dropdown menus (<details data-menu>) on every page: close on outside click or Escape.
 document.addEventListener('click', (event) => {
@@ -1463,8 +1464,16 @@ if (catalog && root) {
             button.title = 'Clear';
             button.setAttribute('aria-label', 'Clear this selection');
             button.innerHTML = '<svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+            button.classList.add('z-10');
 
-            wrapper.append(select, button);
+            // Clicking the field opens the searchable picker instead of the native list.
+            const opener = document.createElement('button');
+            opener.type = 'button';
+            opener.className = 'absolute inset-0 cursor-pointer rounded-md';
+            opener.dataset.pickerOpen = 'true';
+            select.tabIndex = -1;
+
+            wrapper.append(select, button, opener);
         });
     };
 
@@ -1473,7 +1482,85 @@ if (catalog && root) {
             const select = button.previousElementSibling;
             button.classList.toggle('hidden', ! select?.value || select.disabled);
         });
+
+        all('[data-picker-open]').forEach((opener) => {
+            const select = opener.parentElement.querySelector('select');
+            opener.hidden = select.disabled;
+            opener.title = select.title || '';
+            opener.setAttribute('aria-label', `${pickerTitle(select)}: ${select.value ? select.options[select.selectedIndex]?.text : 'none'}. Press to search and change.`);
+        });
     };
+
+    // ---- Searchable picker -----------------------------------------------------------------------------
+
+    const pickerTitle = (select) => {
+        if (select.dataset.skillTier) {
+            return `${select.dataset.skillTier} Badass Point skill`;
+        }
+
+        if (select.dataset.filter === 'hero') {
+            return 'Hero';
+        }
+
+        if (select.dataset.filter === 'enchant') {
+            const where = enchantOwnerLabel(select);
+            return `${select.dataset.enchantSide === 'right' ? 'Right' : 'Left'} enchant${where ? ` · ${where}` : ''}`;
+        }
+
+        return select.dataset.location || 'Item';
+    };
+
+    const enchantOwnerLabel = (select) => select.closest('[data-slot]')?.querySelector('select[data-filter="item"]')?.dataset.location || '';
+
+    const describeOption = (select, optionValue) => {
+        if (select.dataset.filter === 'item') {
+            const item = itemByIndex[optionValue];
+            if (! item) {
+                return null;
+            }
+
+            const hands = Number(item.hands) >= 2 ? 'two-handed' : (Number(item.hands) === 1 ? 'one hand' : null);
+            return [`Weight ${item.weight}`, hands, item.notes].filter(Boolean).join(' · ');
+        }
+
+        if (select.dataset.filter === 'enchant') {
+            const options = select.dataset.enchantSide === 'right' ? rightEnchants : leftEnchants;
+            return options.find((option) => option.value === optionValue)?.effect || null;
+        }
+
+        if (select.dataset.filter === 'hero') {
+            const hero = heroById[optionValue];
+            return hero ? `${hero.class} · ${hero.base_health} ${hero.health_color} health · starts with ${hero.starting_stuff}` : null;
+        }
+
+        return null;
+    };
+
+    const picker = createPicker({
+        prepare: (select) => prepareOptions(select),
+        choose: (select, chosen) => {
+            assign(select, chosen);
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        },
+        describe: describeOption,
+        title: pickerTitle,
+    });
+
+    root.addEventListener('keydown', (event) => {
+        const opener = event.target.closest?.('[data-picker-open]');
+        if (! opener || event.ctrlKey || event.metaKey || event.altKey) {
+            return;
+        }
+
+        // Typing on a focused field starts a search; arrow down opens the list.
+        if (event.key.length === 1 && event.key !== ' ') {
+            event.preventDefault();
+            picker.open(opener.parentElement.querySelector('select'), opener, event.key);
+        } else if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            picker.open(opener.parentElement.querySelector('select'), opener);
+        }
+    });
 
     // ---- Inventory locks -------------------------------------------------------------------------------
 
@@ -1536,6 +1623,11 @@ if (catalog && root) {
     const dragSourceSelect = (target) => {
         if (target.matches?.('select[data-filter="item"]')) {
             return target;
+        }
+
+        const pickerSelect = target.closest?.('[data-picker-open]')?.parentElement.querySelector('select[data-filter="item"]');
+        if (pickerSelect) {
+            return pickerSelect;
         }
 
         return target.closest?.('[data-drag-handle]') ? slotItemSelect(target) : null;
@@ -1869,6 +1961,12 @@ if (catalog && root) {
 
         if (target.matches?.('[data-modal]')) {
             closeModal(target);
+            return;
+        }
+
+        const pickerOpener = target.closest?.('[data-picker-open]');
+        if (pickerOpener) {
+            picker.open(pickerOpener.parentElement.querySelector('select'), pickerOpener);
             return;
         }
 
