@@ -388,7 +388,7 @@
                         <label>
                             <span class="field-label">Upgrade target</span>
                             <select class="control" data-kraft-target>
-                                <option value="">Choose an owned upgradeable item</option>
+                                <option value="">Choose an upgrade the pool can pay for</option>
                             </select>
                         </label>
                         <div>

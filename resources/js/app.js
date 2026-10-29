@@ -16,8 +16,49 @@ document.addEventListener('keydown', (event) => {
     }
 });
 
-if (window.location.hash === '#new-campaign') {
-    document.querySelector('#new-campaign input[name="name"]')?.focus();
+// Native <dialog> popups (e.g. "New campaign"): opening focuses the first field; cancelling clears the form.
+const openDialog = (dialog) => {
+    if (! dialog?.showModal || dialog.open) {
+        return;
+    }
+
+    dialog.showModal();
+    dialog.querySelector('input:not([type="hidden"]), select, textarea')?.focus();
+};
+
+const closeDialog = (dialog) => {
+    dialog?.querySelector('form')?.reset();
+    dialog?.close();
+};
+
+document.addEventListener('click', (event) => {
+    const opener = event.target.closest?.('[data-dialog-open]');
+    if (opener) {
+        openDialog(document.querySelector(`[data-dialog="${opener.dataset.dialogOpen}"]`));
+        return;
+    }
+
+    const closer = event.target.closest?.('[data-dialog-close]');
+    if (closer) {
+        closeDialog(closer.closest('dialog'));
+        return;
+    }
+
+    // A click on the backdrop lands on the <dialog> element itself.
+    if (event.target.matches?.('dialog[data-dialog]')) {
+        closeDialog(event.target);
+    }
+});
+
+document.querySelectorAll('dialog[data-dialog]').forEach((dialog) => {
+    dialog.addEventListener('cancel', (event) => {
+        event.preventDefault();
+        closeDialog(dialog);
+    });
+});
+
+if (window.location.hash === '#new-campaign' || document.querySelector('dialog[data-open-on-load]')) {
+    openDialog(document.querySelector('[data-dialog="new-campaign"]'));
 }
 
 const catalog = window.orcQuestCatalog;
@@ -880,8 +921,11 @@ if (catalog && root) {
         return items.find((candidate) => candidate.name === item.name && candidate.level === item.level + 1 && ! owned.has(candidate.index)) || null;
     };
 
+    // Only upgrades the rekup pool can already pay for are offered; the rest are listed as "almost kraftable".
+    const kraftableTargets = (resources = currentResources()) => allOwnedUpgradeableItems().filter((owned) => canAfford(owned.item, resources));
+
     const currentKraftPlan = () => {
-        const targets = allOwnedUpgradeableItems();
+        const targets = kraftableTargets();
         const target = targets.find((owned) => owned.key === value(document.querySelector('[data-kraft-target]'))) || null;
         const strategy = value(document.querySelector('[data-kraft-strategy]')) || 'least_waste';
 
@@ -958,27 +1002,24 @@ if (catalog && root) {
         }
 
         const cost = resourceBag(target.item.kraft);
-        const missing = subtractBags(cost, resources);
         const next = nextLevelFor(target.item);
         const rows = [
             ['Target', { text: `${target.item.label} · ${target.character}, ${target.location}` }],
             ['Becomes', { text: next ? next.label : `No free ${target.item.name} card of the next level` }],
             ['Kraft cost', { bag: cost }],
             ['Rekup pool', { bag: resources }],
-            ['Missing now', { bag: missing, onlyPositive: true, emptyText: 'Nothing, the pool covers it', alarm: true }],
             ['Payment', { bag: plan?.resources || resourceBag() }],
             ['Wasted', { bag: plan?.waste || resourceBag() }],
         ];
 
         rows.forEach(([label, detail]) => {
-            const alarm = detail.alarm && resourceNames.some((resource) => missing[resource] > 0);
             const row = document.createElement('div');
             row.className = 'grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-2 border-t border-line py-1.5 first:border-t-0';
             const title = document.createElement('span');
-            title.className = `text-[11px] font-semibold uppercase tracking-wide ${alarm ? 'text-danger' : 'text-muted'}`;
+            title.className = 'text-[11px] font-semibold uppercase tracking-wide text-muted';
             title.textContent = label;
             const valueNode = document.createElement('span');
-            valueNode.className = `flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-medium ${alarm ? 'text-danger' : 'text-ink'}`;
+            valueNode.className = 'flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-medium text-ink';
 
             if (detail.text) {
                 valueNode.textContent = detail.text;
@@ -1076,11 +1117,8 @@ if (catalog && root) {
         }
 
         rows.forEach(({ target, missing }) => {
-            const card = document.createElement('button');
-            card.type = 'button';
-            card.className = 'rounded-md border border-line bg-white/70 p-2.5 text-left hover:border-orc-600';
-            card.dataset.kraftPick = target.key;
-            card.title = 'Plan this kraft';
+            const card = document.createElement('div');
+            card.className = 'rounded-md border border-line bg-white/70 p-2.5';
             const title = document.createElement('strong');
             title.className = 'block text-sm font-semibold';
             title.textContent = target.item.label;
@@ -1097,12 +1135,12 @@ if (catalog && root) {
     };
 
     const refreshKraftPlanner = (resources) => {
-        const targets = allOwnedUpgradeableItems();
+        const targets = kraftableTargets(resources);
         const select = document.querySelector('[data-kraft-target]');
 
         if (select) {
             const current = select.value;
-            select.replaceChildren(new Option(targets.length ? 'Choose an owned upgradeable item' : 'No upgradeable items owned', ''));
+            select.replaceChildren(new Option(targets.length ? 'Choose an upgrade the pool can pay for' : 'Nothing is kraftable from the pool yet', ''));
             targets.forEach((target) => select.add(new Option(`${target.item.label} · ${target.character}, ${target.location}`, target.key)));
             select.value = targets.some((target) => target.key === current) ? current : '';
         }
@@ -1110,7 +1148,7 @@ if (catalog && root) {
         const { target, plan } = currentKraftPlan();
         renderKraftSummary(target, resources, plan);
         renderKraftSuggestion(target, plan);
-        renderAlmostCraftable(targets, resources);
+        renderAlmostCraftable(allOwnedUpgradeableItems(), resources);
     };
 
     const refreshResourcesAndUpgrades = () => {

@@ -3,7 +3,10 @@
 @section('title', 'Campaigns · OrcQuest Tracker')
 
 @section('content')
-    <h1 class="page-title mb-4">Campaigns</h1>
+    <div class="mb-4 flex items-center gap-3">
+        <h1 class="page-title flex-1">Campaigns</h1>
+        <button class="grid size-10 shrink-0 place-items-center rounded-full bg-orc-600 text-white shadow-md transition-colors hover:bg-orc-700" type="button" data-dialog-open="new-campaign" title="New campaign" aria-label="New campaign"><x-icon name="plus" class="size-5" /></button>
+    </div>
 
     <div class="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <section class="grid gap-3 sm:grid-cols-2" aria-label="Your campaigns">
@@ -59,18 +62,35 @@
                 <div class="panel grid place-items-center gap-2 p-10 text-center sm:col-span-2">
                     <x-icon name="skull" class="size-10 text-line-strong" />
                     <p class="font-display text-2xl text-stone">No campaigns yet</p>
-                    <p class="text-sm text-muted">Start one on the right, or import a campaign file.</p>
+                    <p class="text-sm text-muted">Create one, or import a campaign file.</p>
+                    <button class="btn btn-primary mt-1" type="button" data-dialog-open="new-campaign"><x-icon name="plus" class="size-4" /> New campaign</button>
                 </div>
             @endforelse
         </section>
 
         <aside class="grid gap-4 lg:sticky lg:top-20">
-            <form class="panel grid gap-3 p-4" id="new-campaign" method="post" action="{{ route('campaigns.store') }}">
+            <form class="panel grid gap-3 p-4" method="post" action="{{ route('campaigns.import') }}" enctype="multipart/form-data">
                 @csrf
-                <h2 class="section-title">New campaign</h2>
+                <h2 class="section-title">Import</h2>
+                <p class="text-sm text-muted">Load a campaign exported from this tracker, or the save file from the original version (<code class="text-xs">orcquest-tracker-state.json</code>).</p>
+                <input class="block w-full text-sm text-ink-soft file:mr-3 file:rounded-md file:border-0 file:bg-paper-deep file:px-3 file:py-2 file:font-semibold file:text-ink-soft hover:file:bg-line" type="file" name="file" accept="application/json,.json" required>
+                @error('file') <p class="text-sm text-danger">{{ $message }}</p> @enderror
+                <button class="btn btn-outline" type="submit">Import file</button>
+            </form>
+        </aside>
+    </div>
+
+    <dialog class="m-auto w-[min(26rem,calc(100vw-2rem))] overflow-visible rounded-lg bg-paper p-0 text-ink shadow-2xl backdrop:bg-ink/60" id="new-campaign" data-dialog="new-campaign" aria-labelledby="new-campaign-title" @if ($errors->has('name')) data-open-on-load @endif>
+        <form class="grid" method="post" action="{{ route('campaigns.store') }}">
+            @csrf
+            <div class="torn-bottom flex items-center justify-between gap-2 rounded-t-lg bg-orc px-4 py-3 text-white">
+                <h2 class="font-display text-xl" id="new-campaign-title">New campaign</h2>
+                <button class="icon-btn size-9 hover:bg-white/10" type="button" data-dialog-close aria-label="Cancel"><x-icon name="x" /></button>
+            </div>
+            <div class="grid gap-3 p-4 pt-6">
                 <label>
                     <span class="field-label">Name</span>
-                    <input class="control" name="name" value="{{ old('name') }}" maxlength="120" placeholder="e.g. Sewer Fever run" required @if ($campaigns->isEmpty() || request()->getRequestUri() === route('campaigns.index', [], false).'#new-campaign') autofocus @endif>
+                    <input class="control" name="name" value="{{ old('name') }}" maxlength="120" placeholder="e.g. Sewer Fever run" required autocomplete="off">
                 </label>
                 @if ($campaigns->isNotEmpty())
                     <label>
@@ -84,17 +104,11 @@
                     </label>
                 @endif
                 @error('name') <p class="text-sm text-danger">{{ $message }}</p> @enderror
-                <button class="btn btn-primary" type="submit"><x-icon name="plus" class="size-4" /> Create campaign</button>
-            </form>
-
-            <form class="panel grid gap-3 p-4" method="post" action="{{ route('campaigns.import') }}" enctype="multipart/form-data">
-                @csrf
-                <h2 class="section-title">Import</h2>
-                <p class="text-sm text-muted">Load a campaign exported from this tracker, or the save file from the original version (<code class="text-xs">orcquest-tracker-state.json</code>).</p>
-                <input class="block w-full text-sm text-ink-soft file:mr-3 file:rounded-md file:border-0 file:bg-paper-deep file:px-3 file:py-2 file:font-semibold file:text-ink-soft hover:file:bg-line" type="file" name="file" accept="application/json,.json" required>
-                @error('file') <p class="text-sm text-danger">{{ $message }}</p> @enderror
-                <button class="btn btn-outline" type="submit">Import file</button>
-            </form>
-        </aside>
-    </div>
+                <div class="mt-1 flex justify-end gap-2">
+                    <button class="btn btn-outline" type="button" data-dialog-close>Cancel</button>
+                    <button class="btn btn-primary" type="submit"><x-icon name="plus" class="size-4" /> Create &amp; open</button>
+                </div>
+            </div>
+        </form>
+    </dialog>
 @endsection
