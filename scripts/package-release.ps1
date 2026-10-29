@@ -50,7 +50,8 @@ try {
     Write-Host 'Zipping...' -ForegroundColor Green
     New-Item -ItemType Directory -Force -Path (Split-Path $zip -Parent) | Out-Null
     if (Test-Path $zip) { Remove-Item $zip }
-    tar -a -c -f $zip -C $stage .
+    # Windows' own bsdtar writes zip files; a Git-for-Windows tar earlier on PATH cannot.
+    & (Join-Path $env:SystemRoot 'System32\tar.exe') -a -c -f $zip -C $stage .
     if ($LASTEXITCODE -ne 0) { throw 'Creating the zip failed' }
 
     $size = [math]::Round((Get-Item $zip).Length / 1MB, 1)
