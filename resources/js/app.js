@@ -1340,7 +1340,8 @@ if (catalog && root) {
 
         setSaveStatus('Saving…', 'pending');
 
-        const body = new FormData(root);
+        // URL-encoded is about half the size of multipart for ~600 short fields.
+        const body = new URLSearchParams(new FormData(root));
         const context = historyContext;
         historyContext = {};
         body.append('version', String(campaignVersion));

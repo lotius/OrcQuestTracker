@@ -7,10 +7,10 @@
                 <img class="size-9 shrink-0 drop-shadow" src="{{ asset('favicon.svg') }}" alt="">
                 <span class="min-w-0 leading-none">
                     <span class="hidden text-[10px] font-semibold uppercase tracking-[0.2em] text-sage sm:block">OrcQuest WarPath</span>
-                    <span class="font-display block truncate text-xl sm:text-2xl">Upgrade Tracker</span>
+                    <span class="font-display hidden truncate text-xl min-[440px]:block sm:text-2xl">Upgrade Tracker</span>
                 </span>
             </a>
-            <nav class="ml-auto flex items-center gap-1 text-sm font-semibold">
+            <nav class="ml-auto flex items-center gap-0.5 whitespace-nowrap text-sm font-semibold sm:gap-1">
                 <a class="rounded-md px-2.5 py-2 text-white/75 hover:bg-white/10 hover:text-white aria-[current=page]:bg-white/15 aria-[current=page]:text-white" href="{{ route('campaigns.index') }}" @if (request()->routeIs('campaigns.index')) aria-current="page" @endif>Campaigns</a>
                 <a class="rounded-md px-2.5 py-2 text-white/75 hover:bg-white/10 hover:text-white aria-[current=page]:bg-white/15 aria-[current=page]:text-white" href="{{ route('account') }}" @if (request()->routeIs('account')) aria-current="page" @endif>Account</a>
                 <form method="post" action="{{ route('logout') }}">

@@ -2,7 +2,7 @@
 
 @font-face {
     font-family: "Metal Mania";
-    src: url("/fonts/metalmania-regular.ttf") format("truetype");
+    src: url("/fonts/metalmania-regular.woff2") format("woff2"), url("/fonts/metalmania-regular.ttf") format("truetype");
     font-display: swap;
 }
 
