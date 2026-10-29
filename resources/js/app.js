@@ -281,16 +281,6 @@ if (catalog && root) {
 
     // ---- Item bundles (item + enchants + rekup travel together) ---------------------------------------
 
-    const selectedValuesExcept = (selector, current) => all(selector)
-        .filter((select) => select !== current)
-        .map((select) => value(select))
-        .filter(Boolean);
-
-    const selectedEnchantCodesExcept = (current) => all('select[data-filter="enchant"]')
-        .filter((select) => select !== current)
-        .map((select) => enchantCode(value(select)))
-        .filter(Boolean);
-
     const itemHands = (itemIndex) => Number(itemByIndex[itemIndex]?.hands || 0);
 
     const isTwoHanded = (itemIndex) => itemHands(itemIndex) >= 2;
@@ -484,36 +474,67 @@ if (catalog && root) {
 
     // ---- Option filtering (each card / hero / enchant can only be in one place) ------------------------
 
-    const setOptionAvailability = (select, isUnavailable) => {
-        Array.from(select.options).forEach((option) => {
-            if (! option.value) {
-                option.disabled = false;
-                option.hidden = false;
-                return;
+    // The page holds ~34k options, so availability is updated incrementally: only options whose key
+    // changed hands since the last refresh (plus each select's own old/new value) are touched.
+    const optionIndexes = new WeakMap();
+    const filterGroups = {
+        hero: { selector: 'select[data-filter="hero"]', keyOf: (optionValue) => optionValue, counts: null },
+        item: { selector: 'select[data-filter="item"]', keyOf: (optionValue) => optionValue, counts: null },
+        enchant: { selector: 'select[data-filter="enchant"]', keyOf: enchantCode, counts: null },
+    };
+
+    const optionIndex = (select, keyOf) => {
+        let index = optionIndexes.get(select);
+
+        if (! index) {
+            index = new Map();
+            Array.from(select.options).forEach((option) => option.value && index.set(keyOf(option.value), option));
+            optionIndexes.set(select, index);
+        }
+
+        return index;
+    };
+
+    const refreshFilterGroup = (group) => {
+        const selects = all(group.selector);
+        const ownKeys = selects.map((select) => (select.value ? group.keyOf(select.value) : ''));
+        const counts = new Map();
+        ownKeys.forEach((key) => key && counts.set(key, (counts.get(key) || 0) + 1));
+
+        const changed = new Set();
+        if (group.counts) {
+            counts.forEach((count, key) => group.counts.get(key) !== count && changed.add(key));
+            group.counts.forEach((_, key) => ! counts.has(key) && changed.add(key));
+        }
+
+        selects.forEach((select, position) => {
+            const own = ownKeys[position];
+            const index = optionIndex(select, group.keyOf);
+            const keys = group.counts && select.dataset.ownKey !== undefined
+                ? new Set([...changed, own, select.dataset.ownKey])
+                : index.keys();
+
+            for (const key of keys) {
+                const option = key && index.get(key);
+                if (! option) {
+                    continue;
+                }
+
+                const unavailable = (counts.get(key) || 0) - (own === key ? 1 : 0) > 0;
+                if (option.disabled !== unavailable) {
+                    option.disabled = unavailable;
+                    option.hidden = unavailable;
+                }
             }
 
-            const unavailable = isUnavailable(option.value) && option.value !== select.value;
-            option.disabled = unavailable;
-            option.hidden = unavailable;
+            select.dataset.ownKey = own;
         });
+
+        group.counts = counts;
     };
 
     const refreshFilteredSelects = () => {
-        all('select[data-filter="hero"]').forEach((select) => {
-            const used = selectedValuesExcept('select[data-filter="hero"]', select);
-            setOptionAvailability(select, (optionValue) => used.includes(optionValue));
-        });
-
-        const usedItems = all('select[data-filter="item"]').map((select) => value(select));
-        all('select[data-filter="item"]').forEach((select) => {
-            const used = new Set(usedItems.filter((itemIndex) => itemIndex && itemIndex !== select.value));
-            setOptionAvailability(select, (optionValue) => used.has(optionValue));
-        });
-
-        all('select[data-filter="enchant"]').forEach((select) => {
-            const usedCodes = selectedEnchantCodesExcept(select);
-            setOptionAvailability(select, (optionValue) => usedCodes.includes(enchantCode(optionValue)));
-        });
+        Object.values(filterGroups).forEach(refreshFilterGroup);
     };
 
     // ---- Skills: hero-specific options; show filled slots plus one empty slot per tier -----------------
@@ -522,6 +543,11 @@ if (catalog && root) {
         characterCards().forEach((card) => {
             const hero = heroById[value(card.querySelector('[data-hero-select]'))];
             const skills = hero?.skills || { 10: [], 20: [], 30: [] };
+            const signature = `${hero?.id || ''}|${all('select[data-skill-tier]', card).map((select) => select.value).join('|')}`;
+
+            if (card.dataset.skillSignature === signature) {
+                return;
+            }
 
             ['10', '20', '30'].forEach((tier) => {
                 const selects = all(`select[data-skill-tier="${tier}"]`, card);
@@ -553,6 +579,8 @@ if (catalog && root) {
                     }
                 });
             });
+
+            card.dataset.skillSignature = `${hero?.id || ''}|${all('select[data-skill-tier]', card).map((select) => select.value).join('|')}`;
         });
     };
 
@@ -1088,6 +1116,18 @@ if (catalog && root) {
         refreshKraftPlanner(resources);
     };
 
+    // The planner runs a search over every inventory card, so it only renders while its tab is open.
+    let resourcesDirty = true;
+
+    const refreshResourcesIfVisible = () => {
+        resourcesDirty = true;
+
+        if (! document.querySelector('[data-tab-panel="resources"]')?.hidden) {
+            refreshResourcesAndUpgrades();
+            resourcesDirty = false;
+        }
+    };
+
     const pickKraftTarget = (key) => {
         const select = document.querySelector('[data-kraft-target]');
         if (! select) {
@@ -1115,6 +1155,11 @@ if (catalog && root) {
 
     const refreshItemTooltips = () => {
         all('select[data-filter="item"]').forEach((select) => {
+            if (select.dataset.tipFor === select.value) {
+                return;
+            }
+
+            select.dataset.tipFor = select.value;
             const item = itemByIndex[select.value];
 
             if (! item) {
@@ -1143,6 +1188,11 @@ if (catalog && root) {
 
     const refreshEnchantTooltips = () => {
         all('select[data-filter="enchant"]').forEach((select) => {
+            if (select.dataset.tipFor === select.value) {
+                return;
+            }
+
+            select.dataset.tipFor = select.value;
             const options = select.dataset.enchantSide === 'right' ? rightEnchants : leftEnchants;
             const enchant = options.find((option) => option.value === select.value);
 
@@ -1371,10 +1421,9 @@ if (catalog && root) {
         setItemBundle(source, destinationBundle);
         setItemBundle(destination, sourceBundle);
 
-        source.dispatchEvent(new Event('change', { bubbles: true }));
-        destination.dispatchEvent(new Event('change', { bubbles: true }));
-        applyHandRules();
         refresh();
+        commitHistory();
+        scheduleAutoSave();
     };
 
     const endDrag = () => {
@@ -1492,6 +1541,9 @@ if (catalog && root) {
         const tabButton = target.closest?.('[data-tab]');
         if (tabButton) {
             showTab(tabButton.dataset.tab);
+            if (tabButton.dataset.tab === 'resources' && resourcesDirty) {
+                refreshResourcesIfVisible();
+            }
             return;
         }
 
@@ -1563,7 +1615,7 @@ if (catalog && root) {
         refreshHeroPanels();
         refreshAlwaysRekupLocks();
         refreshItemEnchantLocks();
-        refreshResourcesAndUpgrades();
+        refreshResourcesIfVisible();
         refreshCampaignCount();
         refreshItemTooltips();
         refreshEnchantTooltips();
@@ -1572,6 +1624,11 @@ if (catalog && root) {
     };
 
     root.addEventListener('change', (event) => {
+        if (event.target.matches('[data-kraft-target], [data-kraft-strategy]')) {
+            refreshResourcesIfVisible();
+            return;
+        }
+
         refresh();
 
         if (event.target.name) {
@@ -1581,9 +1638,8 @@ if (catalog && root) {
     });
 
     root.addEventListener('input', (event) => {
-        if (event.target.matches('select, input[type="checkbox"]')) {
-            refresh();
-        } else if (event.target.matches('[data-player-input]')) {
+        // Selects and checkboxes also fire "change", which refreshes; refreshing here too doubled the work.
+        if (event.target.matches('[data-player-input]')) {
             refreshHeroPanels();
         }
 

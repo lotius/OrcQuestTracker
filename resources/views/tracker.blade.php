@@ -95,19 +95,19 @@
 
             {{-- Characters ------------------------------------------------------------------------ --}}
             <section data-tab-panel="characters">
-                <div class="sticky top-[3.5rem] z-30 -mx-3 mb-3 bg-parchment/95 px-3 pb-2 pt-3 sm:-mx-4 sm:px-4 lg:-mx-6 lg:px-6">
-                    <div class="scrollbar-none flex items-center gap-1.5 overflow-x-auto" data-character-tabs>
+                <div class="z-30 -mx-3 mb-3 bg-parchment/95 px-3 pb-2 pt-1 md:sticky md:top-[3.5rem] md:pt-3 sm:-mx-4 sm:px-4 lg:-mx-6 lg:px-6">
+                    <div class="flex flex-wrap items-center gap-1.5" data-character-tabs>
                         @foreach ($state['characters'] as $slot => $character)
                             @php $chipHero = $summaries[$slot]['hero']; @endphp
-                            <button class="flex shrink-0 items-center gap-2 rounded-full border border-line bg-paper py-1 pl-1 pr-3 text-left text-ink shadow-sm transition-colors hover:border-orc-600 aria-pressed:border-orc aria-pressed:bg-orc aria-pressed:text-white" type="button" data-character-tab="{{ $slot }}" aria-pressed="{{ (string) $slot === (string) $firstActiveSlot ? 'true' : 'false' }}" @if (! ($character['active'] ?? false)) hidden @endif>
+                            <button class="flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-paper py-1 pl-1 pr-2.5 text-left sm:gap-2 sm:pr-3 text-ink shadow-sm transition-colors hover:border-orc-600 aria-pressed:border-orc aria-pressed:bg-orc aria-pressed:text-white" type="button" data-character-tab="{{ $slot }}" aria-pressed="{{ (string) $slot === (string) $firstActiveSlot ? 'true' : 'false' }}" @if (! ($character['active'] ?? false)) hidden @endif>
                                 <span class="relative">
-                                    <img class="size-8 rounded-full object-cover ring-1 ring-black/10" src="{{ $chipHero['icon'] ?? '' }}" alt="" data-chip-icon @if (! $chipHero) hidden @endif>
-                                    <span class="portrait-fallback size-8 place-items-center rounded-full bg-paper-deep text-muted"><x-icon name="skull" class="size-4" /></span>
+                                    <img class="size-7 rounded-full sm:size-8 object-cover ring-1 ring-black/10" src="{{ $chipHero['icon'] ?? '' }}" alt="" data-chip-icon @if (! $chipHero) hidden @endif>
+                                    <span class="portrait-fallback size-7 place-items-center rounded-full bg-paper-deep text-muted sm:size-8"><x-icon name="skull" class="size-4" /></span>
                                     <span class="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-danger ring-2 ring-paper" data-chip-alert title="Over a carrying limit" hidden></span>
                                 </span>
                                 <span class="min-w-0 leading-tight">
-                                    <span class="block max-w-[8.5rem] truncate text-sm font-semibold" data-chip-name>{{ $chipHero['name'] ?? 'Character '.$slot }}</span>
-                                    <span class="block max-w-[8.5rem] truncate text-[11px] opacity-70" data-chip-player>{{ $character['player'] ?: 'No player' }}</span>
+                                    <span class="block max-w-[6.5rem] truncate text-sm font-semibold sm:max-w-[8.5rem]" data-chip-name>{{ $chipHero['name'] ?? 'Character '.$slot }}</span>
+                                    <span class="hidden max-w-[8.5rem] truncate text-[11px] opacity-70 sm:block" data-chip-player>{{ $character['player'] ?: 'No player' }}</span>
                                 </span>
                             </button>
                         @endforeach
